@@ -1724,8 +1724,6 @@ var _pgettext = function (msgctxt, msgid) {
 var _ngettext = function (msgid, msgidPlural, n) {
   var message = this.$i18n.getLocaleMessage(this.$i18n.locale)['$$NOCONTEXT'][msgid];
 
-  console.log(message);
-
   if (!message) {
     return Math.abs(n) === 1 ? msgid : msgidPlural
   } else {
@@ -1796,6 +1794,14 @@ function uuid () {
   return uuid
 }
 
+var stripVData = function (input) {
+  return input.replace(/[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*data\-v\-[0-9A-Za-z\u017F\u212A]{8,}="(?:[\0-\t\x0B\f\x0E-\u2027\u202A-\uD7FF\uE000-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])*?"/gi, '')
+};
+
+var stripHTMLWhitespace = function (input) {
+  return input.replace(/>[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*/gi, '>').replace(/[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*</gi, '<')
+};
+
 var marked = require('marked');
 
 var Component = function (Vue) {
@@ -1842,15 +1848,7 @@ var Component = function (Vue) {
           this.$options._renderChildren[0].tag === undefined) {
           this.msgid = this.$options._renderChildren[0].text.trim();
         } else {
-          var self = this;(function _nodeWalk (_children) {
-            _children.forEach(function (node) {
-              if (node.data && node.data.on) {
-                node.data.on = undefined;
-              }
-
-              _nodeWalk(node.children || []);
-            });
-          })(self.$options._renderChildren);
+          var self = this;
 
           // Mount helper component.
           var HelperComponent = Vue.component('i18n-helper-component', {
@@ -1865,7 +1863,7 @@ var Component = function (Vue) {
           var component = new HelperComponent().$mount();
 
           // Set the string to be the innerHTML of the helper component, but striped of white spaces and Vue's automatically added data-v attributes.
-          this.msgid = component.$el.innerHTML.replace(/>[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*/gi, '>').replace(/[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*</gi, '<').trim().replace(/[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*data\-v\-[0-9A-Za-z\u017F\u212A]{8,}="(?:[\0-\t\x0B\f\x0E-\u2027\u202A-\uD7FF\uE000-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])?"/gi, '');
+          this.msgid = stripVData(stripHTMLWhitespace(component.$el.innerHTML).trim());
           this.msgidHTML = true;
           component.$destroy();
         }
@@ -1952,76 +1950,6 @@ var Component = function (Vue) {
 
 var marked$1 = require('marked');
 
-var updateTranslation = function (el, binding, vnode) {
-  var self = vnode.context;
-  var attrs = vnode.data.attrs || {};
-  var msgid = el.dataset.msgid;
-  var tContext = attrs['t-context'];
-  var tN = attrs['t-n'];
-  var _tN = tN;
-  var tPlural = attrs['t-plural'];
-  var tParams = attrs['t-params'] || {};
-  var md = attrs['md'];
-  var markdown = attrs['markdown'];
-  var isPlural = tN !== undefined && tPlural !== undefined;
-
-  // If there are parameters inside the `v-translate` directive attribute merge them with params.
-  // `vue-translate` values have the priority compared to `t-params`.
-  if (binding.value && typeof binding.value === 'object') {
-    tParams = Object.assign(tParams, binding.value);
-  }
-
-  // Replace n with a value from the params if they are set.
-  // If n isn't a string than it's assumed that a numeric value has been passed, and that value will be used
-  // to determine the plural form (instead of the replace).
-  if (_tN && (typeof _tN === 'string') && tParams) {
-    _tN = tN.trim();
-
-    if (tParams.hasOwnProperty(_tN) && tParams[_tN]) {
-      _tN = tParams[_tN];
-    } else {
-      _tN = undefined;
-    }
-  } else if (typeof _tN !== 'number') {
-    _tN = undefined;
-  }
-
-  if (!isPlural && (tN || tPlural)) {
-    throw new Error('`translate-n` and `translate-plural` attributes must be used together:' + msgid + '.')
-  }
-
-  if (el.innerHTML.trim() !== el.innerText) {
-    // Content is HTML.
-    // Set the string to be the innerHTML, but striped of white spaces and Vue's automatically added data-v attributes.
-    msgid = el.innerHTML.replace(/>[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*/gi, '>').replace(/[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*</gi, '<').trim().replace(/[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*data\-v\-[0-9A-Za-z\u017F\u212A]{8,}="(?:[\0-\t\x0B\f\x0E-\u2027\u202A-\uD7FF\uE000-\uFFFF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF])?"/gi, '');
-  } else {
-    // Content is text.
-    // Set the string to be only text.
-    msgid = el.innerText;
-  }
-
-  var translation = null;
-
-  if (isPlural && tContext) {
-    translation = self.$npgettext(tContext, msgid, isPlural ? tPlural : null, _tN);
-  } else if (isPlural) {
-    translation = self.$ngettext(msgid, isPlural ? tPlural : null, _tN);
-  } else if (tContext) {
-    translation = self.$pgettext(tContext, msgid);
-  } else {
-    translation = self.$gettext(msgid);
-  }
-
-  // Interpolate values from the parent component and from the parameters object.
-  translation = self.$_i18n(translation, Object.assign(self, typeof tParams === 'object' ? tParams : {}));
-
-  if ((markdown !== undefined && markdown !== false) || (md !== undefined && md !== false)) {
-    el.innerHTML = marked$1(translation);
-  } else {
-    el.innerHTML = translation;
-  }
-};
-
 var Directive = {
   bind: function bind (el, binding, vnode) {
     // https://vuejs.org/v2/guide/conditional.html#Controlling-Reusable-Elements-with-key
@@ -2030,10 +1958,74 @@ var Directive = {
       vnode.key = uuid();
     }
 
-    // Get the raw HTML and store it in the element's dataset (as advised in Vue's official guide).
-    el.dataset.msgid = el.innerHTML;
+    var self = vnode.context;
+    var attrs = vnode.data.attrs || {};
+    var msgid = el.innerHTML;
+    var tContext = attrs['t-context'];
+    var tN = attrs['t-n'];
+    var _tN = tN;
+    var tPlural = attrs['t-plural'];
+    var tParams = attrs['t-params'] || {};
+    var md = attrs['md'];
+    var markdown = attrs['markdown'];
+    var isPlural = tN !== undefined && tPlural !== undefined;
 
-    updateTranslation(el, binding, vnode);
+    // If there are parameters inside the `v-translate` directive attribute merge them with params.
+    // `vue-translate` values have the priority compared to `t-params`.
+    if (binding.value && typeof binding.value === 'object') {
+      tParams = Object.assign(tParams, binding.value);
+    }
+
+    // Replace n with a value from the params if they are set.
+    // If n isn't a string than it's assumed that a numeric value has been passed, and that value will be used
+    // to determine the plural form (instead of the replace).
+    if (_tN && (typeof _tN === 'string') && tParams) {
+      _tN = tN.trim();
+
+      if (tParams.hasOwnProperty(_tN) && tParams[_tN]) {
+        _tN = tParams[_tN];
+      } else {
+        _tN = undefined;
+      }
+    } else if (typeof _tN !== 'number') {
+      _tN = undefined;
+    }
+
+    if (!isPlural && (tN || tPlural)) {
+      throw new Error('`translate-n` and `translate-plural` attributes must be used together:' + msgid + '.')
+    }
+
+    if (el.innerHTML.trim() !== el.innerText) {
+      // Content is HTML.
+      // Set the string to be the innerHTML, but striped of white spaces and Vue's automatically added data-v attributes.
+      msgid = stripVData(stripHTMLWhitespace(el.innerHTML).trim());
+      console.log(msgid);
+    } else {
+      // Content is text.
+      // Set the string to be only text.
+      msgid = el.innerText;
+    }
+
+    var translation = null;
+
+    if (isPlural && tContext) {
+      translation = self.$npgettext(tContext, msgid, isPlural ? tPlural : null, _tN);
+    } else if (isPlural) {
+      translation = self.$ngettext(msgid, isPlural ? tPlural : null, _tN);
+    } else if (tContext) {
+      translation = self.$pgettext(tContext, msgid);
+    } else {
+      translation = self.$gettext(msgid);
+    }
+
+    // Interpolate values from the parent component and from the parameters object.
+    translation = self.$_i18n(translation, Object.assign(self, typeof tParams === 'object' ? tParams : {}));
+
+    if ((markdown !== undefined && markdown !== false) || (md !== undefined && md !== false)) {
+      el.innerHTML = marked$1(translation);
+    } else {
+      el.innerHTML = translation;
+    }
   }
 };
 

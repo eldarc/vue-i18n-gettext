@@ -50,8 +50,6 @@ const _pgettext = function (msgctxt, msgid) {
 const _ngettext = function (msgid, msgidPlural, n) {
   const message = this.$i18n.getLocaleMessage(this.$i18n.locale)['$$NOCONTEXT'][msgid]
 
-  console.log(message)
-
   if (!message) {
     return Math.abs(n) === 1 ? msgid : msgidPlural
   } else {

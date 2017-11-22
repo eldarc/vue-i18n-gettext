@@ -1,4 +1,5 @@
 import uuid from './uuid'
+import { stripVData, stripHTMLWhitespace } from './utils'
 const marked = require('marked')
 
 export default function (Vue) {
@@ -47,17 +48,6 @@ export default function (Vue) {
         } else {
           const self = this
 
-          // Remove event handlers from elements (try to not trigger unnecessary reactions).
-          ;(function _nodeWalk (_children) {
-            _children.forEach((node) => {
-              if (node.data && node.data.on) {
-                node.data.on = undefined
-              }
-
-              _nodeWalk(node.children || [])
-            })
-          })(self.$options._renderChildren)
-
           // Mount helper component.
           const HelperComponent = Vue.component('i18n-helper-component', {
             render: function (createElement) {
@@ -71,7 +61,7 @@ export default function (Vue) {
           const component = new HelperComponent().$mount()
 
           // Set the string to be the innerHTML of the helper component, but striped of white spaces and Vue's automatically added data-v attributes.
-          this.msgid = component.$el.innerHTML.replace(/>\s*/giu, '>').replace(/\s*</giu, '<').trim().replace(/\s*data-v-[a-zA-Z0-9]{8,}=".?"/giu, '')
+          this.msgid = stripVData(stripHTMLWhitespace(component.$el.innerHTML).trim())
           this.msgidHTML = true
           component.$destroy()
         }

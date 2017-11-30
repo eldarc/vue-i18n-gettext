@@ -70,7 +70,7 @@ export default {
     }
 
     // Interpolate values from the parent component and from the parameters object.
-    translation = self.$_i18n(translation, Object.assign(self, typeof tParams === 'object' ? tParams : {}))
+    translation = self.$_i(translation, Object.assign(self, typeof tParams === 'object' ? tParams : {}))
 
     if ((markdown !== undefined && markdown !== false) || (md !== undefined && md !== false)) {
       el.innerHTML = marked(translation)

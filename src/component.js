@@ -1,6 +1,7 @@
 import uuid from './uuid'
 import { stripVData, stripHTMLWhitespace } from './utils'
-const marked = require('marked')
+import * as _marked from 'marked'
+const marked = _marked
 
 export default function (Vue) {
   return {

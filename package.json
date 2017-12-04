@@ -45,7 +45,7 @@
     "rollup-plugin-node-resolve": "^3.0.0",
     "rollup-plugin-replace": "^1.1.1",
     "uglify-js": "^2.7.5",
-    "vue-i18n": "^7.3.2",
+    "vue-i18n": "7.3.2",
     "webpack": "^2.2.0",
     "webpack-dev-server": "^2.2.1"
   },

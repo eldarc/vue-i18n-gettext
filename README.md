@@ -1,6 +1,6 @@
 # vue-i18n-gettext
 
-
+# NOTE: Plugin development still in progress!
 
 [![npm](https://img.shields.io/npm/v/vue-i18n-gettext.svg)](https://www.npmjs.com/package/vue-i18n-gettext)
 [![vue2](https://img.shields.io/badge/vue-2.x-brightgreen.svg)](https://vuejs.org/)

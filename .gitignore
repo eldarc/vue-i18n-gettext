@@ -1,6 +1,5 @@
 lib
 coverage
-dist
 docs/_book
 test/e2e/report
 test/e2e/screenshots

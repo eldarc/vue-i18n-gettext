@@ -1,7 +1,7 @@
 {
   "name": "vue-i18n-gettext",
   "description": "Vue gettext support build upon vue-i18n.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": {
     "name": "Eldar Cejvanovic",
     "email": "eldar.cejvanovic@gmail.com"

@@ -1,7 +1,7 @@
 {
   "name": "vue-i18n-gettext",
   "description": "Vue gettext support build upon vue-i18n.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": {
     "name": "Eldar Cejvanovic",
     "email": "eldar.cejvanovic@gmail.com"
@@ -41,6 +41,7 @@
     "power-assert": "^1.4.2",
     "rollup": "^0.36.4",
     "rollup-plugin-buble": "^0.14.0",
+    "rollup-plugin-commonjs": "^8.2.6",
     "rollup-plugin-flow-no-whitespace": "^1.0.0",
     "rollup-plugin-node-resolve": "^3.0.0",
     "rollup-plugin-replace": "^1.1.1",

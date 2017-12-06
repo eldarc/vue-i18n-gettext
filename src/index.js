@@ -16,7 +16,7 @@ function plugin (Vue: any, options: Object = {}) {
   Vue.prototype.$changeLocale = function (locale) {
     if (this.$i18nGettext.allLocales.includes(locale)) {
       const oldLocale = this.$i18n.locale
-      const _routePath = this.$route.matched[0].path.replace(':_locale', locale)
+      const _routePath = this.$route.matched[0].path.replace(':_locale', locale === this.$i18nGettext.defaultLocale ? '' : locale)
 
       // Switch locale.
       this.$i18n.locale = locale
@@ -180,27 +180,30 @@ const GettextInstance = (Vue, options) => {
 // Locale route converts a router route to multiple routes with language prefix.
 // Example: path `/about-us` with allLanguages having `en,de,es` as languages and `en` as defaultLanguage will generate
 // routes with following paths: '/about-us', '/de/about-us', '/es/about-us'
-function LocaleRoute (options) {
-  const config = parseOptions(options)
+class LocaleRoute {
+  constructor (options) {
+    const config = parseOptions(options)
 
-  this.defaultLocale = config.defaultLocale
-  this.allLocales = config.allLocales
-  this.storageMethod = config.storageMethod
-  this.storageKey = config.storageKey
-  this.storageFunctions = config.storageFunctions
+    this.defaultLocale = config.defaultLocale
+    this.allLocales = config.allLocales
+    this.storageMethod = config.storageMethod
+    this.storageKey = config.storageKey
+    this.storageFunctions = config.storageFunctions
 
-  if (this.storageMethod !== 'custom') {
-    this.savedLocale = switchMethods[this.storageMethod].load(this.storageKey) || this.defaultLocale
-  } else {
-    this.savedLocale = this.storageFunctions.load(this.storageKey) || this.defaultLocale
+    if (this.storageMethod !== 'custom') {
+      this.savedLocale = switchMethods[this.storageMethod].load(this.storageKey) || this.defaultLocale
+    } else {
+      this.savedLocale = this.storageFunctions.load(this.storageKey) || this.defaultLocale
+    }
   }
 
-  this.set = function (route) {
+  set (route) {
     const _originalRoute = Object.assign({}, route)
     const _prefixedRoute = Object.assign({}, route)
     const _plainPath = route.path
 
     // If the route is plain, detect the selected locale and redirect to the proper URL.
+    _originalRoute.name = '__default:' + _plainPath
     _originalRoute.beforeEnter = (to, from, next) => {
       if (this.savedLocale !== this.defaultLocale && to.fullPath === _plainPath) {
         let _nextPath = '/' + this.savedLocale + '/' + _plainPath
@@ -221,7 +224,9 @@ function LocaleRoute (options) {
     _prefixedRoute.params._locale = this.defaultLocale
 
     _prefixedRoute.beforeEnter = (to, from, next) => {
-      if (to.params._locale === this.defaultLocale && to.fullPath !== _plainPath) {
+      if (!this.allLocales.includes(to.params._locale)) {
+        next({ name: '__default:' + to.fullPath })
+      } else if (to.params._locale === this.defaultLocale && to.fullPath !== _plainPath) {
         next(_plainPath)
       }
 
@@ -244,7 +249,12 @@ const gettextMixin = {
       }
     } else if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'redirect') {
       if (this.$route.params._locale !== this.$i18n.locale) {
-        this.$router.push(this.$route.matched[0].path.replace(':_locale', this.$i18n.locale === this.$i18nGettext.defaultLocale ? '' : this.$i18n.locale))
+        if (this.$i18n.locale === this.$i18nGettext.defaultLocale) {
+          const _next = this.$route.matched[0].path.replace(':_locale', '')
+          this.$router.push({ name: '__default:' + (_next || '/') })
+        } else {
+          this.$router.push(this.$route.matched[0].path.replace(':_locale', this.$i18n.locale))
+        }
       }
     }
   }

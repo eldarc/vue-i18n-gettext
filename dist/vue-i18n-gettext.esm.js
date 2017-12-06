@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.1 
+ * vue-i18n-gettext v0.0.2 
  * (c) 2017 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -1802,6 +1802,17 @@ var stripHTMLWhitespace = function (input) {
   return input.replace(/>[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*/gi, '>').replace(/[\t-\r \xA0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*</gi, '<')
 };
 
+var commonjsGlobal = typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+
+
+
+
+function createCommonjsModule(fn, module) {
+	return module = { exports: {} }, fn(module, module.exports), module.exports;
+}
+
+var marked$1 = createCommonjsModule(function (module, exports) {
 /**
  * marked - a markdown parser
  * Copyright (c) 2011-2014, Christopher Jeffrey. (MIT Licensed)
@@ -3089,21 +3100,24 @@ marked.inlineLexer = InlineLexer.output;
 
 marked.parse = marked;
 
-if (typeof module !== 'undefined' && typeof exports === 'object') {
+if ('object' !== 'undefined' && 'object' === 'object') {
   module.exports = marked;
-} else if (typeof define === 'function' && define.amd) {
-  define(function() { return marked; });
+} else if (typeof undefined === 'function' && undefined.amd) {
+  undefined(function() { return marked; });
 } else {
   this.marked = marked;
 }
 
 }).call(function() {
-  return this || (typeof window !== 'undefined' ? window : global);
+  return this || (typeof window !== 'undefined' ? window : commonjsGlobal);
 }());
+});
+
 
 
 var _marked = Object.freeze({
-
+	default: marked$1,
+	__moduleExports: marked$1
 });
 
 var marked = _marked;
@@ -3252,7 +3266,7 @@ var Component = function (Vue) {
   }
 };
 
-var marked$1 = _marked;
+var marked$3 = _marked;
 
 var Directive = {
   bind: function bind (el, binding, vnode) {
@@ -3325,7 +3339,7 @@ var Directive = {
     translation = self.$_i(translation, Object.assign(self, typeof tParams === 'object' ? tParams : {}));
 
     if ((markdown !== undefined && markdown !== false) || (md !== undefined && md !== false)) {
-      el.innerHTML = marked$1(translation);
+      el.innerHTML = marked$3(translation);
     } else {
       el.innerHTML = translation;
     }
@@ -3347,7 +3361,7 @@ function plugin (Vue, options) {
   Vue.prototype.$changeLocale = function (locale) {
     if (this.$i18nGettext.allLocales.includes(locale)) {
       var oldLocale = this.$i18n.locale;
-      var _routePath = this.$route.matched[0].path.replace(':_locale', locale);
+      var _routePath = this.$route.matched[0].path.replace(':_locale', locale === this.$i18nGettext.defaultLocale ? '' : locale);
 
       // Switch locale.
       this.$i18n.locale = locale;
@@ -3511,7 +3525,7 @@ var GettextInstance = function (Vue, options) {
 // Locale route converts a router route to multiple routes with language prefix.
 // Example: path `/about-us` with allLanguages having `en,de,es` as languages and `en` as defaultLanguage will generate
 // routes with following paths: '/about-us', '/de/about-us', '/es/about-us'
-function LocaleRoute (options) {
+var LocaleRoute = function LocaleRoute (options) {
   var config = parseOptions(options);
 
   this.defaultLocale = config.defaultLocale;
@@ -3525,45 +3539,48 @@ function LocaleRoute (options) {
   } else {
     this.savedLocale = this.storageFunctions.load(this.storageKey) || this.defaultLocale;
   }
+};
 
-  this.set = function (route) {
+LocaleRoute.prototype.set = function set (route) {
     var this$1 = this;
 
-    var _originalRoute = Object.assign({}, route);
-    var _prefixedRoute = Object.assign({}, route);
-    var _plainPath = route.path;
+  var _originalRoute = Object.assign({}, route);
+  var _prefixedRoute = Object.assign({}, route);
+  var _plainPath = route.path;
 
-    // If the route is plain, detect the selected locale and redirect to the proper URL.
-    _originalRoute.beforeEnter = function (to, from, next) {
-      if (this$1.savedLocale !== this$1.defaultLocale && to.fullPath === _plainPath) {
-        var _nextPath = '/' + this$1.savedLocale + '/' + _plainPath;
-        _nextPath = _nextPath.replace(new RegExp('/{2,}', 'giu'), '/');
-        next(_nextPath);
-      }
-
-      next();
-    };
-
-    // Based on the `_locale` in URL select active locale.
-    _prefixedRoute.path = '/:_locale/' + _prefixedRoute.path;
-    _prefixedRoute.path = _prefixedRoute.path.replace(new RegExp('/{2,}', 'giu'), '/');
-
-    if (!_prefixedRoute.params) {
-      _prefixedRoute.params = {};
+  // If the route is plain, detect the selected locale and redirect to the proper URL.
+  _originalRoute.name = '__default:' + _plainPath;
+  _originalRoute.beforeEnter = function (to, from, next) {
+    if (this$1.savedLocale !== this$1.defaultLocale && to.fullPath === _plainPath) {
+      var _nextPath = '/' + this$1.savedLocale + '/' + _plainPath;
+      _nextPath = _nextPath.replace(new RegExp('/{2,}', 'giu'), '/');
+      next(_nextPath);
     }
-    _prefixedRoute.params._locale = this.defaultLocale;
 
-    _prefixedRoute.beforeEnter = function (to, from, next) {
-      if (to.params._locale === this$1.defaultLocale && to.fullPath !== _plainPath) {
-        next(_plainPath);
-      }
-
-      next();
-    };
-
-    return [_originalRoute, _prefixedRoute]
+    next();
   };
-}
+
+  // Based on the `_locale` in URL select active locale.
+  _prefixedRoute.path = '/:_locale/' + _prefixedRoute.path;
+  _prefixedRoute.path = _prefixedRoute.path.replace(new RegExp('/{2,}', 'giu'), '/');
+
+  if (!_prefixedRoute.params) {
+    _prefixedRoute.params = {};
+  }
+  _prefixedRoute.params._locale = this.defaultLocale;
+
+  _prefixedRoute.beforeEnter = function (to, from, next) {
+    if (!this$1.allLocales.includes(to.params._locale)) {
+      next({ name: '__default:' + to.fullPath });
+    } else if (to.params._locale === this$1.defaultLocale && to.fullPath !== _plainPath) {
+      next(_plainPath);
+    }
+
+    next();
+  };
+
+  return [_originalRoute, _prefixedRoute]
+};
 
 var gettextMixin = {
   created: function created () {
@@ -3577,13 +3594,18 @@ var gettextMixin = {
       }
     } else if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'redirect') {
       if (this.$route.params._locale !== this.$i18n.locale) {
-        this.$router.push(this.$route.matched[0].path.replace(':_locale', this.$i18n.locale === this.$i18nGettext.defaultLocale ? '' : this.$i18n.locale));
+        if (this.$i18n.locale === this.$i18nGettext.defaultLocale) {
+          var _next = this.$route.matched[0].path.replace(':_locale', '');
+          this.$router.push({ name: '__default:' + (_next || '/') });
+        } else {
+          this.$router.push(this.$route.matched[0].path.replace(':_locale', this.$i18n.locale));
+        }
       }
     }
   }
 };
 
-plugin.version = '0.0.1';
+plugin.version = '0.0.2';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

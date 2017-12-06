@@ -1,6 +1,7 @@
 const replace = require('rollup-plugin-replace')
 const flow = require('rollup-plugin-flow-no-whitespace')
 const buble = require('rollup-plugin-buble')
+const commonjs = require('rollup-plugin-commonjs');
 const resolve = require('rollup-plugin-node-resolve')
 const banner = require('./banner')
 const pack = require('../package.json')
@@ -61,6 +62,14 @@ function genConfig (opts) {
         customResolveOptions: {
           moduleDirectory: 'node_modules'
         }
+      }),
+      commonjs({
+        // non-CommonJS modules will be ignored, but you can also
+        // specifically include/exclude files
+        // include: 'node_modules/**',  // Default: undefined
+        // exclude: [ 'node_modules/foo/**', 'node_modules/bar/**' ],  // Default: undefined
+        // these values can also be regular expressions
+        // include: /node_modules/
       })
     ]
   }

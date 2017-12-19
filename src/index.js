@@ -243,9 +243,10 @@ const gettextMixin = {
       this.$i18nGettext.customOnLoad(this)
     }
 
+    // TODO: Add global process override.
     if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'changeLocale') {
       if (this.$route.params._locale !== this.$i18n.locale) {
-        this.$i18n.locale = this.$route.params._locale
+        this.$changeLocale(this.$route.params._locale)
       }
     } else if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'redirect') {
       if (this.$route.params._locale !== this.$i18n.locale) {

@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.2 
+ * vue-i18n-gettext v0.0.3 
  * (c) 2017 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -3588,9 +3588,10 @@ var gettextMixin = {
       this.$i18nGettext.customOnLoad(this);
     }
 
+    // TODO: Add global process override.
     if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'changeLocale') {
       if (this.$route.params._locale !== this.$i18n.locale) {
-        this.$i18n.locale = this.$route.params._locale;
+        this.$changeLocale(this.$route.params._locale);
       }
     } else if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'redirect') {
       if (this.$route.params._locale !== this.$i18n.locale) {
@@ -3605,7 +3606,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.2';
+plugin.version = '0.0.3';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

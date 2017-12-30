@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.3 
+ * vue-i18n-gettext v0.0.4 
  * (c) 2017 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -1536,6 +1536,383 @@ VueI18n.version = '7.3.2';
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(VueI18n);
 }
+
+/**
+ * Expose `pathToRegexp`.
+ */
+var pathToRegexp_1 = pathToRegexp;
+var parse_1 = parse$1$1;
+var compile_1 = compile$1;
+var tokensToFunction_1 = tokensToFunction;
+var tokensToRegExp_1 = tokensToRegExp;
+
+/**
+ * Default configs.
+ */
+var DEFAULT_DELIMITER = '/';
+var DEFAULT_DELIMITERS = './';
+
+/**
+ * The main path matching regexp utility.
+ *
+ * @type {RegExp}
+ */
+var PATH_REGEXP = new RegExp([
+  // Match escaped characters that would otherwise appear in future matches.
+  // This allows the user to escape special characters that won't transform.
+  '(\\\\.)',
+  // Match Express-style parameters and un-named parameters with a prefix
+  // and optional suffixes. Matches appear as:
+  //
+  // "/:test(\\d+)?" => ["/", "test", "\d+", undefined, "?"]
+  // "/route(\\d+)"  => [undefined, undefined, undefined, "\d+", undefined]
+  '(?:\\:(\\w+)(?:\\(((?:\\\\.|[^\\\\()])+)\\))?|\\(((?:\\\\.|[^\\\\()])+)\\))([+*?])?'
+].join('|'), 'g');
+
+/**
+ * Parse a string for the raw tokens.
+ *
+ * @param  {string}  str
+ * @param  {Object=} options
+ * @return {!Array}
+ */
+function parse$1$1 (str, options) {
+  var tokens = [];
+  var key = 0;
+  var index = 0;
+  var path = '';
+  var defaultDelimiter = (options && options.delimiter) || DEFAULT_DELIMITER;
+  var delimiters = (options && options.delimiters) || DEFAULT_DELIMITERS;
+  var pathEscaped = false;
+  var res;
+
+  while ((res = PATH_REGEXP.exec(str)) !== null) {
+    var m = res[0];
+    var escaped = res[1];
+    var offset = res.index;
+    path += str.slice(index, offset);
+    index = offset + m.length;
+
+    // Ignore already escaped sequences.
+    if (escaped) {
+      path += escaped[1];
+      pathEscaped = true;
+      continue
+    }
+
+    var prev = '';
+    var next = str[index];
+    var name = res[2];
+    var capture = res[3];
+    var group = res[4];
+    var modifier = res[5];
+
+    if (!pathEscaped && path.length) {
+      var k = path.length - 1;
+
+      if (delimiters.indexOf(path[k]) > -1) {
+        prev = path[k];
+        path = path.slice(0, k);
+      }
+    }
+
+    // Push the current path onto the tokens.
+    if (path) {
+      tokens.push(path);
+      path = '';
+      pathEscaped = false;
+    }
+
+    var partial = prev !== '' && next !== undefined && next !== prev;
+    var repeat = modifier === '+' || modifier === '*';
+    var optional = modifier === '?' || modifier === '*';
+    var delimiter = prev || defaultDelimiter;
+    var pattern = capture || group;
+
+    tokens.push({
+      name: name || key++,
+      prefix: prev,
+      delimiter: delimiter,
+      optional: optional,
+      repeat: repeat,
+      partial: partial,
+      pattern: pattern ? escapeGroup(pattern) : '[^' + escapeString(delimiter) + ']+?'
+    });
+  }
+
+  // Push any remaining characters.
+  if (path || index < str.length) {
+    tokens.push(path + str.substr(index));
+  }
+
+  return tokens
+}
+
+/**
+ * Compile a string to a template function for the path.
+ *
+ * @param  {string}             str
+ * @param  {Object=}            options
+ * @return {!function(Object=, Object=)}
+ */
+function compile$1 (str, options) {
+  return tokensToFunction(parse$1$1(str, options))
+}
+
+/**
+ * Expose a method for transforming tokens into the path function.
+ */
+function tokensToFunction (tokens) {
+  // Compile all the tokens into regexps.
+  var matches = new Array(tokens.length);
+
+  // Compile all the patterns before compilation.
+  for (var i = 0; i < tokens.length; i++) {
+    if (typeof tokens[i] === 'object') {
+      matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$');
+    }
+  }
+
+  return function (data, options) {
+    var path = '';
+    var encode = (options && options.encode) || encodeURIComponent;
+
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+
+      if (typeof token === 'string') {
+        path += token;
+        continue
+      }
+
+      var value = data ? data[token.name] : undefined;
+      var segment;
+
+      if (Array.isArray(value)) {
+        if (!token.repeat) {
+          throw new TypeError('Expected "' + token.name + '" to not repeat, but got array')
+        }
+
+        if (value.length === 0) {
+          if (token.optional) { continue }
+
+          throw new TypeError('Expected "' + token.name + '" to not be empty')
+        }
+
+        for (var j = 0; j < value.length; j++) {
+          segment = encode(value[j]);
+
+          if (!matches[i].test(segment)) {
+            throw new TypeError('Expected all "' + token.name + '" to match "' + token.pattern + '"')
+          }
+
+          path += (j === 0 ? token.prefix : token.delimiter) + segment;
+        }
+
+        continue
+      }
+
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        segment = encode(String(value));
+
+        if (!matches[i].test(segment)) {
+          throw new TypeError('Expected "' + token.name + '" to match "' + token.pattern + '", but got "' + segment + '"')
+        }
+
+        path += token.prefix + segment;
+        continue
+      }
+
+      if (token.optional) {
+        // Prepend partial segment prefixes.
+        if (token.partial) { path += token.prefix; }
+
+        continue
+      }
+
+      throw new TypeError('Expected "' + token.name + '" to be ' + (token.repeat ? 'an array' : 'a string'))
+    }
+
+    return path
+  }
+}
+
+/**
+ * Escape a regular expression string.
+ *
+ * @param  {string} str
+ * @return {string}
+ */
+function escapeString (str) {
+  return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, '\\$1')
+}
+
+/**
+ * Escape the capturing group by escaping special characters and meaning.
+ *
+ * @param  {string} group
+ * @return {string}
+ */
+function escapeGroup (group) {
+  return group.replace(/([=!:$/()])/g, '\\$1')
+}
+
+/**
+ * Get the flags for a regexp from the options.
+ *
+ * @param  {Object} options
+ * @return {string}
+ */
+function flags (options) {
+  return options && options.sensitive ? '' : 'i'
+}
+
+/**
+ * Pull out keys from a regexp.
+ *
+ * @param  {!RegExp} path
+ * @param  {Array=}  keys
+ * @return {!RegExp}
+ */
+function regexpToRegexp (path, keys) {
+  if (!keys) { return path }
+
+  // Use a negative lookahead to match only capturing groups.
+  var groups = path.source.match(/\((?!\?)/g);
+
+  if (groups) {
+    for (var i = 0; i < groups.length; i++) {
+      keys.push({
+        name: i,
+        prefix: null,
+        delimiter: null,
+        optional: false,
+        repeat: false,
+        partial: false,
+        pattern: null
+      });
+    }
+  }
+
+  return path
+}
+
+/**
+ * Transform an array into a regexp.
+ *
+ * @param  {!Array}  path
+ * @param  {Array=}  keys
+ * @param  {Object=} options
+ * @return {!RegExp}
+ */
+function arrayToRegexp (path, keys, options) {
+  var parts = [];
+
+  for (var i = 0; i < path.length; i++) {
+    parts.push(pathToRegexp(path[i], keys, options).source);
+  }
+
+  return new RegExp('(?:' + parts.join('|') + ')', flags(options))
+}
+
+/**
+ * Create a path regexp from string input.
+ *
+ * @param  {string}  path
+ * @param  {Array=}  keys
+ * @param  {Object=} options
+ * @return {!RegExp}
+ */
+function stringToRegexp (path, keys, options) {
+  return tokensToRegExp(parse$1$1(path, options), keys, options)
+}
+
+/**
+ * Expose a function for taking tokens and returning a RegExp.
+ *
+ * @param  {!Array}  tokens
+ * @param  {Array=}  keys
+ * @param  {Object=} options
+ * @return {!RegExp}
+ */
+function tokensToRegExp (tokens, keys, options) {
+  options = options || {};
+
+  var strict = options.strict;
+  var end = options.end !== false;
+  var delimiter = escapeString(options.delimiter || DEFAULT_DELIMITER);
+  var delimiters = options.delimiters || DEFAULT_DELIMITERS;
+  var endsWith = [].concat(options.endsWith || []).map(escapeString).concat('$').join('|');
+  var route = '';
+  var isEndDelimited = false;
+
+  // Iterate over the tokens and create our regexp string.
+  for (var i = 0; i < tokens.length; i++) {
+    var token = tokens[i];
+
+    if (typeof token === 'string') {
+      route += escapeString(token);
+      isEndDelimited = i === tokens.length - 1 && delimiters.indexOf(token[token.length - 1]) > -1;
+    } else {
+      var prefix = escapeString(token.prefix);
+      var capture = token.repeat
+        ? '(?:' + token.pattern + ')(?:' + prefix + '(?:' + token.pattern + '))*'
+        : token.pattern;
+
+      if (keys) { keys.push(token); }
+
+      if (token.optional) {
+        if (token.partial) {
+          route += prefix + '(' + capture + ')?';
+        } else {
+          route += '(?:' + prefix + '(' + capture + '))?';
+        }
+      } else {
+        route += prefix + '(' + capture + ')';
+      }
+    }
+  }
+
+  if (end) {
+    if (!strict) { route += '(?:' + delimiter + ')?'; }
+
+    route += endsWith === '$' ? '$' : '(?=' + endsWith + ')';
+  } else {
+    if (!strict) { route += '(?:' + delimiter + '(?=' + endsWith + '))?'; }
+    if (!isEndDelimited) { route += '(?=' + delimiter + '|' + endsWith + ')'; }
+  }
+
+  return new RegExp('^' + route, flags(options))
+}
+
+/**
+ * Normalize the given path string, returning a regular expression.
+ *
+ * An empty array can be passed in for the keys, which will hold the
+ * placeholder key descriptions. For example, using `/user/:id`, `keys` will
+ * contain `[{ name: 'id', delimiter: '/', optional: false, repeat: false }]`.
+ *
+ * @param  {(string|RegExp|Array)} path
+ * @param  {Array=}                keys
+ * @param  {Object=}               options
+ * @return {!RegExp}
+ */
+function pathToRegexp (path, keys, options) {
+  if (path instanceof RegExp) {
+    return regexpToRegexp(path, keys)
+  }
+
+  if (Array.isArray(path)) {
+    return arrayToRegexp(/** @type {!Array} */ (path), keys, options)
+  }
+
+  return stringToRegexp(/** @type {string} */ (path), keys, options)
+}
+
+pathToRegexp_1.parse = parse_1;
+pathToRegexp_1.compile = compile_1;
+pathToRegexp_1.tokensToFunction = tokensToFunction_1;
+pathToRegexp_1.tokensToRegExp = tokensToRegExp_1;
 
 /**
  * Plural Forms
@@ -3351,7 +3728,7 @@ var Directive = {
 };
 
 /*  */
-function plugin (Vue, options) {
+function plugin (Vue, options, router) {
   if ( options === void 0 ) options = {};
 
   // Expose gettext functions.
@@ -3361,14 +3738,16 @@ function plugin (Vue, options) {
   Vue.prototype.$npgettext = gettextFunctions._npgettext;
   Vue.prototype.$_i = gettextFunctions._i18nInterpolate;
 
-  // Updates the selected language and if router prefixing is configured redirects to the proper language route.
+  // Changes the active locale.
   Vue.prototype.$changeLocale = function (locale) {
+    // TODO: Move this helper function to a global helpers object.
+    var _matchedPathtoPath = function (path, replace, replacement) {
+      var _path = path.replace(replace, replacement).replace(new RegExp('/{2,}', 'giu'), '/');
+      return _path !== '' ? _path : '/'
+    };
+
     if (this.$i18nGettext.allLocales.includes(locale)) {
       var oldLocale = this.$i18n.locale;
-      var _routePath = this.$route.matched[0].path.replace(':_locale', locale === this.$i18nGettext.defaultLocale ? '' : locale);
-
-      // Switch locale.
-      this.$i18n.locale = locale;
 
       if (this.$i18nGettext.storageMethod !== 'custom') {
         switchMethods[this.$i18nGettext.storageMethod].save(this.$i18nGettext.storageKey, locale, oldLocale, this.$i18nGettext.cookieExpirationInDays);
@@ -3376,22 +3755,26 @@ function plugin (Vue, options) {
         this.$i18nGettext.storageFunctions.save(this.$i18nGettext.storageKey, locale, oldLocale);
       }
 
-      // If router prefixing is enabled, push route.
-      this.$router.push(_routePath);
-      window.location.reload();
+      this.$i18n.locale = locale;
+
+      if (this.$i18nGettext.usingRouter) {
+        this.$route.params._locale = locale;
+        this.$router.push({
+          name: '__locale:' + _matchedPathtoPath(this.$route.matched[0].path, ':_locale', ''),
+          params: Object.assign(this.$route.params, { _locale: locale, _changeLocale: true })
+        });
+        window.location.reload();
+      } else {
+        window.location.reload();
+      }
     }
   };
 
-  // Converts a router link to the version of the current language.
+  // Converts a router link to the version of the current locale.
   Vue.prototype.$localeLink = function (link) {
-    link = '/' + (this.$i18n.locale !== this.$i18nGettext.defaultLocale ? this.$i18n.locale : '') + '/' + (this.$i18nGettext.allLocales.includes(link) ? '' : link);
-    link = link.replace(new RegExp('/{2,}', 'giu'), '/');
-
-    if (link > 1 && link.charAt(link.length - 1) === '/') {
-      link.path = link.path.slice(0, -1);
-    }
-
-    return link
+    var toPath = pathToRegexp_1.compile(link.replace('$locale', ':_locale?'));
+    var path = toPath({ _locale: this.$i18n.locale === this.$i18nGettext.defaultLocale ? (this.$i18nGettext.defaultLocaleInRoutes ? this.$i18n.locale : undefined) : this.$i18n.locale });
+    return path === '' ? '/' : path
   };
 
   // Makes <translate> available as a global component.
@@ -3401,7 +3784,7 @@ function plugin (Vue, options) {
   Vue.directive('translate', Directive);
 }
 
-// Built-in methods for changing and selecting the locale.
+// Built-in methods for changing, selecting and storing the locale.
 var switchMethods = {
   session: {
     save: function save (key, newLocale, oldLocale) {
@@ -3475,6 +3858,7 @@ var parseOptions = function (options) {
     defaultLocale: options.defaultLocale || 'en',
     allLocales: options.allLocales || (options.defaultLocale ? [options.defaultLocale] : ['en']),
     usingRouter: options.usingRouter || false,
+    defaultLocaleInRoutes: options.defaultLocaleInRoutes || false,
     routingStyle: options.routingStyle || 'changeLocale',
     storageMethod: typeof options.storageMethod !== 'object' ? (['session', 'local', 'cookie'].includes(options.storageMethod.trim()) ? options.storageMethod.trim() : 'local') : 'custom',
     storageKey: options.storageKey || '_vue_i18n_gettext_locale',
@@ -3526,64 +3910,151 @@ var GettextInstance = function (Vue, options) {
   return _i18n
 };
 
-// Locale route converts a router route to multiple routes with language prefix.
-// Example: path `/about-us` with allLanguages having `en,de,es` as languages and `en` as defaultLanguage will generate
-// routes with following paths: '/about-us', '/de/about-us', '/es/about-us'
-var LocaleRoute = function LocaleRoute (options) {
+// Default gettext router guard to help proper routing when there are locales in the URL path.
+var GettextRouterGuard = function (options, router) {
   var config = parseOptions(options);
 
-  this.defaultLocale = config.defaultLocale;
-  this.allLocales = config.allLocales;
-  this.storageMethod = config.storageMethod;
-  this.storageKey = config.storageKey;
-  this.storageFunctions = config.storageFunctions;
+  var _path = function (path, replacement) {
+    var _path = path.replace('$locale', replacement).replace(new RegExp('/{2,}', 'giu'), '/');
+    return _path !== '' ? _path : '/'
+  };
 
-  if (this.storageMethod !== 'custom') {
-    this.savedLocale = switchMethods[this.storageMethod].load(this.storageKey) || this.defaultLocale;
+  // TODO: Move this helper function to a global helpers object.
+  var _matchedPathtoPath = function (path, replace, replacement) {
+    var _path = path.replace(replace, replacement).replace(new RegExp('/{2,}', 'giu'), '/');
+    return _path !== '' ? _path : '/'
+  };
+
+  // Prepare the routes to be ready for translation purposes.
+  // Duplicate all routes, and make a `blank` and a `locale` version.
+  // Blank versions are paths without the `_locale` parameter, and locale versions are paths with the `:_locale` parameter.
+  // Delete the previous router paths, and set it to the newly prepared routes array.
+  var _modifiedRoutes = [];
+
+  router.options.routes.forEach(function (route) {
+    var blankPath = _path(route.path, '');
+    var localePath = _path(route.path, ':_locale');
+
+    _modifiedRoutes.push(Object.assign(
+      Object.assign({}, route),
+      {
+        name: '__blank:' + blankPath,
+        path: blankPath
+      }
+    ));
+    _modifiedRoutes.push(Object.assign(
+      Object.assign({}, route),
+      {
+        name: '__locale:' + blankPath,
+        path: localePath
+      }
+    ));
+  });
+  router.options.routes = [];
+  router.addRoutes(_modifiedRoutes);
+
+  // Get saved locale data.
+  var savedLocale;
+  if (config.storageMethod !== 'custom') {
+    savedLocale = switchMethods[config.storageMethod].load(config.storageKey);
   } else {
-    this.savedLocale = this.storageFunctions.load(this.storageKey) || this.defaultLocale;
+    savedLocale = config.storageFunctions.load(config.storageKey);
   }
-};
 
-LocaleRoute.prototype.set = function set (route) {
-    var this$1 = this;
+  return function (to, from, next) {
+    var localeSwitch = to.params._changeLocale;
 
-  var _originalRoute = Object.assign({}, route);
-  var _prefixedRoute = Object.assign({}, route);
-  var _plainPath = route.path;
+    if (to.params._locale) {
+      if (!config.allLocales.includes(to.params._locale)) {
+        // Fallback to the path without the `_locale` parameter if the parsed `_locale` value isn't in the configuration locales list.
+        // If the request URL, for example, was `domain.com/about-us`, and the router matched `about-us` as the locale,
+        // the matched path `/:_locale` will be converted to `/about-us` and send to the router as the next path.
+        // This route was prepared in advance and a name was set in the form of `__blank:{{path}}`.
+        var localeReplacement = to.params._locale;
+        delete to.params._locale;
+        next({
+          name: '__blank:' + _matchedPathtoPath(to.matched[0].path, ':_locale', localeReplacement),
+          params: to.params,
+          hash: to.hash,
+          query: to.query
+        });
+      } else {
+        if (to.params._locale !== savedLocale && !localeSwitch) {
+          if (config.routingStyle === 'redirect') {
+            // Change the parsed locale to the saved locale if the config says that there should be always a redirection to the saved locale.
+            next({
+              name: '__locale:' + _matchedPathtoPath(to.matched[0].path, ':_locale', ''),
+              params: Object.assign(to.params, { _locale: savedLocale }),
+              hash: to.hash,
+              query: to.query
+            });
+          } else if (config.routingStyle === 'changeLocale') {
+            // Don't change the path, but change the selected locale if the config defines the routing style to `changeLocale`.
+            if (config.storageMethod !== 'custom') {
+              switchMethods[config.storageMethod].save(config.storageKey, to.params._locale, savedLocale, config.cookieExpirationInDays);
+            } else {
+              config.storageFunctions.save(config.storageKey, to.params._locale, savedLocale);
+            }
 
-  // If the route is plain, detect the selected locale and redirect to the proper URL.
-  _originalRoute.name = '__default:' + _plainPath;
-  _originalRoute.beforeEnter = function (to, from, next) {
-    if (this$1.savedLocale !== this$1.defaultLocale && to.fullPath === _plainPath) {
-      var _nextPath = '/' + this$1.savedLocale + '/' + _plainPath;
-      _nextPath = _nextPath.replace(new RegExp('/{2,}', 'giu'), '/');
-      next(_nextPath);
+            router.go({
+              name: to.name,
+              params: to.params,
+              hash: to.hash,
+              query: to.query
+            });
+          }
+        } else if (config.defaultLocaleInRoutes === false && to.params._locale === config.defaultLocale) {
+          // If the parsed `_locale` is equal to the default locale, and the config says that there are no URLs which include the default locale
+          // replace the `_locale` and redirect to the named blank version.
+          delete to.params._locale;
+          next({
+            name: '__blank:' + _matchedPathtoPath(to.matched[0].path, ':_locale', ''),
+            params: to.params,
+            hash: to.hash,
+            query: to.query
+          });
+        } else {
+          next();
+        }
+      }
+    } else {
+      if (config.defaultLocale !== savedLocale && !localeSwitch) {
+        if (config.routingStyle === 'redirect') {
+          // Change the parsed locale to the saved locale if the config says that there should be always a redirection to the saved locale.
+          next({
+            name: '__locale:' + _matchedPathtoPath(to.matched[0].path, ':_locale', ''),
+            params: Object.assign(to.params, { _locale: savedLocale }),
+            hash: to.hash,
+            query: to.query
+          });
+        } else if (config.routingStyle === 'changeLocale') {
+          // Don't change the path, but change the selected locale if the config defines the routing style to `changeLocale`.
+          if (config.storageMethod !== 'custom') {
+            switchMethods[config.storageMethod].save(config.storageKey, config.defaultLocale, savedLocale, config.cookieExpirationInDays);
+          } else {
+            config.storageFunctions.save(config.storageKey, config.defaultLocale, savedLocale);
+          }
+
+          router.go({
+            name: to.name,
+            params: to.params,
+            hash: to.hash,
+            query: to.query
+          });
+        }
+      } else if (config.defaultLocaleInRoutes === true) {
+        // If the config says that there cannot be an URL without a locale, redirect a blank route to a locale route.
+        next({
+          name: '__locale:' + _matchedPathtoPath(to.matched[0].path, ':_locale', ''),
+          params: Object.assign(to.params, { _locale: config.defaultLocale }),
+          hash: to.hash,
+          query: to.query
+        });
+      } else {
+        next();
+      }
     }
-
-    next();
-  };
-
-  // Based on the `_locale` in URL select active locale.
-  _prefixedRoute.path = '/:_locale/' + _prefixedRoute.path;
-  _prefixedRoute.path = _prefixedRoute.path.replace(new RegExp('/{2,}', 'giu'), '/');
-
-  if (!_prefixedRoute.params) {
-    _prefixedRoute.params = {};
   }
-  _prefixedRoute.params._locale = this.defaultLocale;
-
-  _prefixedRoute.beforeEnter = function (to, from, next) {
-    if (!this$1.allLocales.includes(to.params._locale)) {
-      next({ name: '__default:' + to.fullPath });
-    } else if (to.params._locale === this$1.defaultLocale && to.fullPath !== _plainPath) {
-      next(_plainPath);
-    }
-
-    next();
-  };
-
-  return [_originalRoute, _prefixedRoute]
 };
 
 var gettextMixin = {
@@ -3591,26 +4062,10 @@ var gettextMixin = {
     if (this.$i18nGettext.customOnLoad && typeof this.$i18nGettext.customOnLoad === 'function') {
       this.$i18nGettext.customOnLoad(this);
     }
-
-    // TODO: Add global process override.
-    if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'changeLocale') {
-      if (this.$route.params._locale !== this.$i18n.locale) {
-        this.$changeLocale(this.$route.params._locale);
-      }
-    } else if (this.$i18nGettext.usingRouter && this.$i18nGettext.routingStyle === 'redirect') {
-      if (this.$route.params._locale !== this.$i18n.locale) {
-        if (this.$i18n.locale === this.$i18nGettext.defaultLocale) {
-          var _next = this.$route.matched[0].path.replace(':_locale', '');
-          this.$router.push({ name: '__default:' + (_next || '/') });
-        } else {
-          this.$router.push(this.$route.matched[0].path.replace(':_locale', this.$i18n.locale));
-        }
-      }
-    }
   }
 };
 
-plugin.version = '0.0.3';
+plugin.version = '0.0.4';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);
@@ -3618,7 +4073,7 @@ if (typeof window !== 'undefined' && window.Vue) {
 
 exports.VueGettext = plugin;
 exports.GettextInstance = GettextInstance;
-exports.LocaleRoute = LocaleRoute;
+exports.GettextRouterGuard = GettextRouterGuard;
 exports.gettextMixin = gettextMixin;
 exports.VueI18n = VueI18n;
 exports['default'] = plugin;

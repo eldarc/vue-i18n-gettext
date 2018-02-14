@@ -1,9 +1,7 @@
 import uuid from './uuid'
-import { stripVData, stripHTMLWhitespace } from './utils'
-import * as _marked from 'marked'
-const marked = _marked
+import { stripVData, stripHTMLWhitespace } from './util'
 
-export default function (Vue) {
+export default function (Vue, marked) {
   return {
     name: 'translate',
 
@@ -117,9 +115,9 @@ export default function (Vue) {
         }
 
         // Interpolate values from the parent component and from the parameters object.
-        translation = this.$_i18n(translation, Object.assign(this.$parent, typeof this.tParams === 'object' ? this.tParams : {}))
+        translation = this.$_i(translation, Object.assign(this.$parent, typeof this.tParams === 'object' ? this.tParams : {}))
 
-        if ((this.markdown !== undefined && this.markdown !== false) || (this.md !== undefined && this.md !== false)) {
+        if (marked !== undefined && (this.markdown !== undefined && this.markdown !== false) || (this.md !== undefined && this.md !== false)) {
           this.msgidHTML = true
           return marked(translation)
         } else {

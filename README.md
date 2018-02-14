@@ -1,12 +1,11 @@
 # vue-i18n-gettext
 
-# NOTE: Plugin development still in progress!
+# NOTE: Plugin nearly ready for first version; Routing feature + Documentation is in progress.
 
 [![npm](https://img.shields.io/npm/v/vue-i18n-gettext.svg)](https://www.npmjs.com/package/vue-i18n-gettext)
 [![vue2](https://img.shields.io/badge/vue-2.x-brightgreen.svg)](https://vuejs.org/)
 
-Vue gettext support build upon vue-i18n.
-
+Full-featured gettext support for Vue.js.
 
 ## :book: Documentation
 See [here](http://eldarc.github.io/vue-i18n-gettext/)

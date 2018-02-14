@@ -1,4 +1,5 @@
 import plurals from './plurals'
+import interpolate from './interpolate'
 
 // Translation items indexed as:
 // "FIRST_CONTEXT": {
@@ -23,7 +24,7 @@ import plurals from './plurals'
 
 // Singular
 const _gettext = function (msgid) {
-  const message = this.$i18n.getLocaleMessage(this.$i18n.locale)['$$NOCONTEXT'][msgid]
+  const message = this.$i18n.getLocaleMessage(this.$i18n.activeLocale)['$$NOCONTEXT'][msgid]
 
   if (!message) {
     return msgid
@@ -35,8 +36,8 @@ const _gettext = function (msgid) {
 // Context + Singular
 const _pgettext = function (msgctxt, msgid) {
   let message
-  if (this.$i18n.getLocaleMessage(this.$i18n.locale)[msgctxt]) {
-    message = this.$i18n.getLocaleMessage(this.$i18n.locale)[msgctxt][msgid]
+  if (this.$i18n.getLocaleMessage(this.$i18n.activeLocale)[msgctxt]) {
+    message = this.$i18n.getLocaleMessage(this.$i18n.activeLocale)[msgctxt][msgid]
   }
 
   if (!message) {
@@ -48,12 +49,12 @@ const _pgettext = function (msgctxt, msgid) {
 
 // Plural
 const _ngettext = function (msgid, msgidPlural, n) {
-  const message = this.$i18n.getLocaleMessage(this.$i18n.locale)['$$NOCONTEXT'][msgid]
+  const message = this.$i18n.getLocaleMessage(this.$i18n.activeLocale)['$$NOCONTEXT'][msgid]
 
   if (!message) {
     return Math.abs(n) === 1 ? msgid : msgidPlural
   } else {
-    const pluralIndex = plurals.getTranslationIndex(this.$i18n.locale, n)
+    const pluralIndex = plurals.getTranslationIndex(this.$i18n.activeLocale, n)
     let _msgidPlural = message.msgstr[pluralIndex]
 
     if (!_msgidPlural) {
@@ -71,14 +72,14 @@ const _ngettext = function (msgid, msgidPlural, n) {
 // Context + Plural
 const _npgettext = function (msgctxt, msgid, msgidPlural, n) {
   let message
-  if (this.$i18n.getLocaleMessage(this.$i18n.locale)[msgctxt]) {
-    message = this.$i18n.getLocaleMessage(this.$i18n.locale)[msgctxt][msgid]
+  if (this.$i18n.getLocaleMessage(this.$i18n.activeLocale)[msgctxt]) {
+    message = this.$i18n.getLocaleMessage(this.$i18n.activeLocale)[msgctxt][msgid]
   }
 
   if (!message) {
     return Math.abs(n) === 1 ? msgid : msgidPlural
   } else {
-    const pluralIndex = plurals.getTranslationIndex(this.$i18n.locale, n)
+    const pluralIndex = plurals.getTranslationIndex(this.$i18n.activeLocale, n)
     let _msgidPlural = message.msgstr[pluralIndex]
 
     if (!_msgidPlural) {
@@ -95,7 +96,7 @@ const _npgettext = function (msgctxt, msgid, msgidPlural, n) {
 
 // Interpolate and return a string.
 const _i18nInterpolate = function (msgid, values) {
-  return this.$i18n._render(msgid, 'string', values)
+  return interpolate(msgid, 'string', values)
 }
 
 export default { _i18nInterpolate, _gettext, _pgettext, _ngettext, _npgettext }

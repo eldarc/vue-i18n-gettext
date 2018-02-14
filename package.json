@@ -35,7 +35,6 @@
     "karma-safari-launcher": "^1.0.0",
     "karma-sourcemap-loader": "^0.3.7",
     "karma-webpack": "^2.0.2",
-    "marked": "^0.3.6",
     "mocha": "^3.2.0",
     "mocha-loader": "^1.1.1",
     "path-to-regexp": "^2.1.0",
@@ -86,5 +85,6 @@
     "test": "npm run lint && npm run flow && npm run test:cover",
     "test:cover": "BABEL_ENV=test karma start config/karma.cover.conf.js",
     "test:unit": "BABEL_ENV=test karma start config/karma.unit.conf.js"
-  }
+  },
+  "dependencies": {}
 }

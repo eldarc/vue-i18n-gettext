@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.5 
+ * vue-i18n-gettext v0.0.7 
  * (c) 2018 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -1261,9 +1261,9 @@ function plugin (Vue, options, router, marked) {
   // TODO: Move load and save of stored keys to helper functions.
   var savedLocale;
   if (config.storageMethod !== 'custom') {
-    savedLocale = switchMethods[config.storageMethod].load(config.storageKey);
+    savedLocale = switchMethods[config.storageMethod].load(config.storageKey) || config.defaultLocale;
   } else {
-    savedLocale = config.storageFunctions.load(config.storageKey);
+    savedLocale = config.storageFunctions.load(config.storageKey) || config.defaultLocale;
   }
 
   // Modify the router so that is compatible with locale routing and switching.
@@ -1275,21 +1275,19 @@ function plugin (Vue, options, router, marked) {
 
   // Prepare the routes to be ready for translation purposes.
   // Duplicate all routes, and make a `blank` and a `locale` version.
-  // Blank versions are paths without the `_locale` parameter, and locale versions are paths with the `:_locale` parameter.
+  // Blank versions are paths without the `_locale` parameter, and locale versions are paths with the `:_locale?` parameter.
   // Delete the previous router paths, and set it to the newly prepared routes array.
   var _modifiedRoutes = [];
   if (router) {
     // Duplicate routes and assign valid names.
     router.options.routes.forEach(function (_route) {
-      var blankPath = _path(_route.path, '$locale', '');
-      var localePath = _path(_route.path, '$locale', ':_locale');
-
+      // Prepare seed routes.
       var i18nId = uuid();
       _modifiedRoutes.push(Object.assign(
         Object.assign({}, _route),
         {
           name: _route.name ? _route.name : i18nId,
-          path: blankPath,
+          path: !config.routeAutoPrefix ? _path(_route.path, '$locale', '') : _route.path,
           meta: {
             i18nId: i18nId,
             localized: false
@@ -1297,44 +1295,94 @@ function plugin (Vue, options, router, marked) {
         }
       ));
 
-      var localeName = '__locale:' + i18nId;
-      _modifiedRoutes.push(Object.assign(
-        Object.assign({}, _route),
-        {
-          name: localeName,
-          path: config.routeAutoPrefix ? '/:_locale?' + localePath : localePath,
-          meta: {
-            seedI18n: i18nId,
-            localized: true
-          }
-        }
-      ));
-
-      // Remove names from sub-routes in the __locale version.
-      var currentRoute = _modifiedRoutes[_modifiedRoutes.length - 1];
-      if (currentRoute.children) {
-        currentRoute.children = JSON.parse(JSON.stringify(currentRoute.children))
-
-        ;(function removeNames (_currentRoute) {
+      // Prepare children of the seed route.
+      var currentSeedRoute = _modifiedRoutes[_modifiedRoutes.length - 1];
+      if (currentSeedRoute.children && currentSeedRoute.children.length > 0) {
+        (function modifyChild (_currentRoute) {
           _currentRoute.children.forEach(function (childRoute) {
-            childRoute.name = null;
+            var i18nId = uuid();
+            childRoute.name = childRoute.name || i18nId;
 
             if (!childRoute.meta) {
               childRoute.meta = {};
             }
 
-            childRoute.meta.childOfLocale = localeName;
+            childRoute.meta = {
+              i18nId: i18nId,
+              localized: false
+            };
 
             if (childRoute.children && childRoute.children.length > 0) {
-              removeNames(childRoute);
+              modifyChild(childRoute);
             }
           });
-        })(currentRoute);
+        })(currentSeedRoute);
+      }
+
+      // Prepare locale routes.
+      _modifiedRoutes.push(Object.assign(
+        Object.assign({}, currentSeedRoute),
+        {
+          name: '__locale:' + currentSeedRoute.meta.i18nId,
+          path: config.routeAutoPrefix ? _path('/:_locale?/' + currentSeedRoute.path) : currentSeedRoute.path,
+          meta: {
+            i18nId: undefined,
+            seedI18nId: currentSeedRoute.meta.i18nId,
+            localized: true,
+            seedRoute: currentSeedRoute
+          },
+          redirect: currentSeedRoute.redirect ? '/:_locale?' + currentSeedRoute.redirect : undefined
+        }
+      ));
+      delete _modifiedRoutes[_modifiedRoutes.length - 1].meta.i18nId;
+
+      // Prepare children of the locale route.
+      var currentLocaleRoute = _modifiedRoutes[_modifiedRoutes.length - 1];
+      if (currentLocaleRoute.children && currentLocaleRoute.children.length > 0) {
+        // Duplicate the children array, and then restore references to the original child except for
+        // following keys: children, meta.
+        var childrenInstance = JSON.parse(JSON.stringify(currentLocaleRoute.children));(function adjustLocaleSubroutes (currentRoutes, childrenReference) {
+          currentRoutes.forEach(function (childRoute, i) {
+            var objectKeys = Object.keys(childRoute);
+
+            objectKeys.forEach(function (key) {
+              if (key !== 'children' && key !== 'meta') {
+                childRoute[key] = childrenReference[i][key];
+              }
+            });
+
+            if (childRoute.children && childRoute.children.length > 0) {
+              adjustLocaleSubroutes(childRoute.children, childrenReference[i].children);
+            }
+          });
+        })(childrenInstance, currentLocaleRoute.children)
+
+        // Add new names for locale subroutes, and add additional meta data.
+        ;(function modifyChild (currentRoutes, childrenReference) {
+          currentRoutes.forEach(function (childRoute, i) {
+            childRoute.name = '__locale:' + childRoute.meta.i18nId;
+
+            if (!childRoute.meta) {
+              childRoute.meta = {};
+            }
+
+            childRoute.meta = Object.assign(childRoute.meta, {
+              i18nId: undefined,
+              seedI18n: childRoute.meta.i18nId,
+              localized: true,
+              seedRoute: childrenReference[i]
+            });
+
+            if (childRoute.children && childRoute.children.length > 0) {
+              modifyChild(childRoute.children, childrenReference[i].children);
+            }
+          });
+        })(childrenInstance, currentLocaleRoute.children);
+        currentLocaleRoute.children = childrenInstance;
       }
     });
 
     // Reset routes.
-    // delete router.options.routes
     router.matcher = new (Object.getPrototypeOf(router)).constructor({
       mode: 'history',
       routes: []
@@ -1342,138 +1390,128 @@ function plugin (Vue, options, router, marked) {
 
     // Add new routes.
     router.addRoutes(_modifiedRoutes);
-    // console.log(_modifiedRoutes)
-    // console.log(_modifiedRoutes)
-    // console.log(_mapLocaleNameToOriginal)
-    // console.log(router.options.routes)
 
     // Inject the gettext router guard to the router.
     router.beforeEach(function (to, from, next) {
-      if ((to.params._locale && !config.allLocales.includes(to.params._locale)) || (to.params._locale && to.params._locale === config.defaultLocale && !config.defaultLocaleInRoutes)) {
-        // If the route is matched as the homepage or the locale is the default locale (and default locale in the url is disabled),
-        // use the locale parameter to find the actual wanted route (which is located in the seed routes).
-        var validLocaleMatchPath = to.matched[0].path.replace(':_locale?', '__locale__/' + to.params._locale);
-        var validLocaleMatch = router.match(validLocaleMatchPath); // TODO: Check what match can return.
-        var validMatch = _modifiedRoutes.find(function (route) { return route.meta.i18nId === validLocaleMatch.meta.seedI18n; });
+      var actualTo;
 
-        next({
-          name: validMatch.name,
-          params: Object.assign(to.params, { _locale: config.defaultLocale }),
-          hash: to.hash,
-          query: to.query
-        });
-      } else if (to.params._locale === config.defaultLocale && !to.meta.localized && config.defaultLocaleInRoutes) {
-        // If the wanted route has no locale in it, but the configuration requires all locales (even the default) to be
-        // in the URL, redirect to the one with the locale.
-        next({
-          name: '__locale:' + to.meta.i18nId,
-          params: Object.assign(to.params, { _locale: undefined }),
-          hash: to.hash,
-          query: to.query
-        });
-      } else if (to.params._locale) {
-        // If the localized URL is valid
+      // Have always a locale set.
+      if (!to.params._locale) {
+        to.params._locale = config.defaultLocale;
       }
 
+      // Verify that the valid `to` route is selected.
+      if (!config.allLocales.includes(to.params._locale)) {
+        var validLocaleMatchPath = to.matched[0].path.replace(':_locale?', '__locale__/' + to.params._locale);
+        var validLocaleMatch = router.match(validLocaleMatchPath);
+        actualTo = validLocaleMatch.meta.seedRoute;
+      }
+
+      // Set `to` to the actual match.
+      if (actualTo) {
+        actualTo.params = Object.assign(to.params, { _detected: true });
+        actualTo.hash = to.hash;
+        actualTo.query = to.query;
+        actualTo._actual = true;
+
+        if (!config.allLocales.includes(actualTo.params._locale)) {
+          actualTo.params._locale = config.defaultLocale;
+        }
+
+        to = actualTo;
+      }
+
+      // Record if the path request came from a normal request or while changing the saved locale.
+      var localeSwitch = to.params._changeLocale;
+
+      // Helper for defining the `next` object.
+      var defineNext = function (name, params) {
+        return {
+          name: name || to.name,
+          params: params ? Object.assign(to.params, params) : to.params,
+          hash: to.hash,
+          query: to.query
+        }
+      };
+
+      // Handle the default locale.
+      var routeDefaultLocale = function (_changeLocale) {
+        // If the saved locale is equal to the default locale make sure that the URL format is correct.
+        if (to.meta.localized && !config.defaultLocaleInRoutes) {
+          var _next = defineNext(to.meta.seedRoute.name);
+
+          if (_changeLocale) {
+            router.go(_next);
+          } else {
+            next(_next);
+          }
+        } else if (!to.meta.localized && config.defaultLocaleInRoutes) {
+          var _next$1 = defineNext('__locale:' + to.meta.i18nId);
+
+          if (_changeLocale) {
+            router.go(_next$1);
+          } else {
+            next(_next$1);
+          }
+        } else if (_changeLocale) {
+          router.go(defineNext());
+        }
+      };
+
+      // Helper for saving the new locale.
+      var saveLocale = function (newLocale) {
+        if (config.storageMethod !== 'custom') {
+          switchMethods[config.storageMethod].save(config.storageKey, newLocale, savedLocale, config.cookieExpirationInDays);
+        } else {
+          config.storageFunctions.save(config.storageKey, newLocale, savedLocale);
+        }
+      };
+
+      // Parse the route when it contains a locale that is not currently selected.
+      if (to.params._locale !== savedLocale) {
+        if (to.meta.localized) {
+          if (to.params._locale !== config.defaultLocale) {
+            if (config.routingStyle === 'changeLocale') {
+              saveLocale(to.params._locale);
+              router.go(defineNext());
+            } else if (config.routingStyle === 'redirect') {
+              next(defineNext(null, { _locale: savedLocale }));
+            }
+          } else {
+            if (config.routingStyle === 'changeLocale') {
+              saveLocale(to.params._locale);
+              routeDefaultLocale(true);
+            } else if (config.routingStyle === 'redirect') {
+              next(defineNext(null, { _locale: savedLocale }));
+            }
+          }
+        } else {
+          if (to.params._locale !== config.defaultLocale) {
+            if (config.routingStyle === 'changeLocale') {
+              saveLocale(to.params._locale);
+              router.go(defineNext('__locale:' + to.meta.i18nId));
+            } else if (config.routingStyle === 'redirect') {
+              next(defineNext('__locale:' + to.meta.i18nId, { _locale: savedLocale }));
+            }
+          } else {
+            if (config.routingStyle === 'changeLocale') {
+              saveLocale(to.params._locale);
+              routeDefaultLocale(true);
+            } else if (config.routingStyle === 'redirect') {
+              next(defineNext('__locale:' + to.meta.i18nId, { _locale: savedLocale }));
+            }
+          }
+        }
+      } else if (to.params._locale === config.defaultLocale) {
+        routeDefaultLocale();
+      }
+
+      // If there is a detection of an route that was mismatch originally, reroute to the valid match.
+      if (actualTo && !actualTo.params._detected) {
+        next(actualTo);
+      }
       next();
     });
-
-    // Inject the gettext router guard to the router.
-    // router.beforeEach((to, from, next) => {
-    //   console.log(to)
-    //   const localeSwitch = to.params._changeLocale
-    //
-    //   if (to.params._locale) {
-    //     if (!config.allLocales.includes(to.params._locale)) {
-    //       // Fallback to the path without the `_locale` parameter if the parsed `_locale` value isn't in the configuration locales list.
-    //       // If the request URL, for example, was `domain.com/about-us`, and the router matched `about-us` as the locale,
-    //       // the matched path `/:_locale` will be converted to `/about-us` and send to the router as the next path.
-    //       // This route was prepared in advance and a name was set in the form of `__blank:{{path}}`.
-    //       const localeReplacement = to.params._locale
-    //       delete to.params._locale
-    //       next({
-    //         name: _mapLocaleNameToOriginal._get('__blank:' + _matchedPathtoPath(to.matched[to.matched.length - 1].path, ':_locale?', localeReplacement)),
-    //         params: to.params,
-    //         hash: to.hash,
-    //         query: to.query
-    //       })
-    //     } else {
-    //       if (to.params._locale !== savedLocale && !localeSwitch) {
-    //         if (config.routingStyle === 'redirect') {
-    //           // Change the parsed locale to the saved locale if the config says that there should be always a redirection to the saved locale.
-    //           next({
-    //             name: '__locale:' + _matchedPathtoPath(to.matched[to.matched.length - 1].path, ':_locale?', ''),
-    //             params: Object.assign(to.params, { _locale: savedLocale }),
-    //             hash: to.hash,
-    //             query: to.query
-    //           })
-    //         } else if (config.routingStyle === 'changeLocale') {
-    //           // Don't change the path, but change the selected locale if the config defines the routing style to `changeLocale`.
-    //           if (config.storageMethod !== 'custom') {
-    //             switchMethods[config.storageMethod].save(config.storageKey, to.params._locale, savedLocale, config.cookieExpirationInDays)
-    //           } else {
-    //             config.storageFunctions.save(config.storageKey, to.params._locale, savedLocale)
-    //           }
-    //
-    //           router.go({
-    //             name: to.name,
-    //             params: to.params,
-    //             hash: to.hash,
-    //             query: to.query
-    //           })
-    //         }
-    //       } else if (config.defaultLocaleInRoutes === false && to.params._locale === config.defaultLocale) {
-    //         // If the parsed `_locale` is equal to the default locale, and the config says that there are no URLs which include the default locale
-    //         // replace the `_locale` and redirect to the named blank version.
-    //         delete to.params._locale
-    //         next({
-    //           name: _mapLocaleNameToOriginal._get('__blank:' + _matchedPathtoPath(to.matched[to.matched.length - 1] ? to.matched[to.matched.length - 1].path : to.path, ':_locale?', '')),
-    //           params: to.params,
-    //           hash: to.hash,
-    //           query: to.query
-    //         })
-    //       } else {
-    //         next()
-    //       }
-    //     }
-    //   } else {
-    //     if (config.defaultLocale !== savedLocale && !localeSwitch) {
-    //       if (config.routingStyle === 'redirect') {
-    //         // Change the parsed locale to the saved locale if the config says that there should be always a redirection to the saved locale.
-    //         next({
-    //           name: '__locale:' + _matchedPathtoPath(to.matched[to.matched.length - 1].path, ':_locale?', ''),
-    //           params: Object.assign(to.params, { _locale: savedLocale }),
-    //           hash: to.hash,
-    //           query: to.query
-    //         })
-    //       } else if (config.routingStyle === 'changeLocale') {
-    //         // Don't change the path, but change the selected locale if the config defines the routing style to `changeLocale`.
-    //         if (config.storageMethod !== 'custom') {
-    //           switchMethods[config.storageMethod].save(config.storageKey, config.defaultLocale, savedLocale, config.cookieExpirationInDays)
-    //         } else {
-    //           config.storageFunctions.save(config.storageKey, config.defaultLocale, savedLocale)
-    //         }
-    //
-    //         router.go({
-    //           name: to.name,
-    //           params: to.params,
-    //           hash: to.hash,
-    //           query: to.query
-    //         })
-    //       }
-    //     } else if (config.defaultLocaleInRoutes === true) {
-    //       // If the config says that there cannot be an URL without a locale, redirect a blank route to a locale route.
-    //       next({
-    //         name: '__locale:' + _matchedPathtoPath(to.matched[to.matched.length - 1].path, ':_locale?', ''),
-    //         params: Object.assign(to.params, { _locale: config.defaultLocale }),
-    //         hash: to.hash,
-    //         query: to.query
-    //       })
-    //     } else {
-    //       next()
-    //     }
-    //   }
-    // })
   }
 
   // Expose parsed configuration to the Vue instance.
@@ -1492,8 +1530,6 @@ function plugin (Vue, options, router, marked) {
 
   // Changes the active locale.
   Vue.prototype.$changeLocale = function (locale) {
-    var this$1 = this;
-
     if (this.$i18n.allLocales.includes(locale)) {
       var oldLocale = this.$i18n.activeLocale;
 
@@ -1509,9 +1545,8 @@ function plugin (Vue, options, router, marked) {
 
       if (this.$i18n.usingRouter && router) {
         if (!this.$i18n.defaultLocaleInRoutes && locale === this.$i18n.defaultLocale && this.$route.meta.localized === true) {
-          var targetRoute = this.$i18nRoutes.find(function (route) { return route.meta.i18nId === this$1.$route.meta.seedI18n; });
           this.$router.push({
-            name: targetRoute.name,
+            name: this.$route.meta.seedRoute.name,
             params: Object.assign(this.$route.params, { _locale: undefined, _changeLocale: true }),
             hash: this.$route.hash,
             query: this.$route.query
@@ -1524,9 +1559,8 @@ function plugin (Vue, options, router, marked) {
             query: this.$route.query
           });
         } else {
-          var targetRoute$1 = this.$i18nRoutes.find(function (route) { return route.meta.seedI18n === this$1.$route.meta.i18nId; });
           this.$router.push({
-            name: targetRoute$1.name,
+            name: '__locale:' + this.$route.meta.i18nId,
             params: Object.assign(this.$route.params, { _locale: locale, _changeLocale: true }),
             hash: this.$route.hash,
             query: this.$route.query
@@ -1625,7 +1659,7 @@ var parseOptions = function (options) {
     allLocales: options.allLocales || (options.defaultLocale ? [options.defaultLocale] : ['en']),
     forceReloadOnSwitch: options.forceReloadOnSwitch || true,
     usingRouter: options.usingRouter || false,
-    defaultLocaleInRoutes: options.defaultLocaleInRoutes || true,
+    defaultLocaleInRoutes: options.defaultLocaleInRoutes || false,
     routingStyle: options.routingStyle || 'changeLocale',
     routeAutoPrefix: options.routeAutoPrefix || true,
     // TODO: Implement better storageMethod parsing.
@@ -1650,7 +1684,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.5';
+plugin.version = '0.0.7';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

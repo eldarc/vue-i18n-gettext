@@ -237,7 +237,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
 
       // Set `to` to the actual match.
       if (actualTo) {
-        actualTo.params = Object.assign(to.params, { _detected: true })
+        actualTo.params = to.params
         actualTo.hash = to.hash
         actualTo.query = to.query
         actualTo._actual = true
@@ -335,7 +335,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       }
 
       // If there is a detection of an route that was mismatch originally, reroute to the valid match.
-      if (actualTo && !actualTo.params._detected) {
+      if (actualTo) {
         next(actualTo)
       }
       next()
@@ -407,19 +407,45 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
   }
 
   // Converts a router link to the version of the current locale.
-  const _localeLink = function (link) {
-    let toPath
-    if (this.$i18n.routeAutoPrefix) {
-      toPath = pathToRegexp.compile(_path('/:_locale?/' + link))
-    } else {
-      toPath = pathToRegexp.compile(link.replace('$locale', ':_locale?'))
-    }
+  const _localeLink = function (location) {
+    if (typeof location === 'string') {
+      let toPath
+      if (this.$i18n.routeAutoPrefix) {
+        toPath = pathToRegexp.compile(_path('/:_locale?/' + location))
+      } else {
+        toPath = pathToRegexp.compile(location.replace('$locale', ':_locale?'))
+      }
 
-    const path = toPath({ _locale: this.$i18n.activeLocale === this.$i18n.defaultLocale ? (this.$i18n.defaultLocaleInRoutes ? this.$i18n.activeLocale : undefined) : this.$i18n.activeLocale })
-    return path === '' ? '/' : path
+      const path = toPath({ _locale: this.$i18n.activeLocale === this.$i18n.defaultLocale ? (this.$i18n.defaultLocaleInRoutes ? this.$i18n.activeLocale : undefined) : this.$i18n.activeLocale })
+      return path === '' ? '/' : path
+    } else {
+      return location
+    }
+    // TODO: Add support when the object contains name and/or path.
   }
   Vue.prototype.$localeLink = _localeLink
-  Vue.prototype.$L = _localeLink
+  Vue.prototype.$ll = _localeLink
+
+  // Expose the locale version of the router.
+  if (config.usingRouter && router) {
+    router.locPush = (location, onComplete, onAbort) => {
+      router.push(location ? router.app.$localeLink(location) : location, onComplete, onAbort)
+    }
+
+    router.locReplace = (location, onComplete, onAbort) => {
+      router.replace(location ? router.app.$localeLink(location) : location, onComplete, onAbort)
+    }
+
+    router.locGo = (n) => {
+      if (typeof n === 'string') {
+        router.go(n ? router.app.$localeLink(n) : n)
+      } else {
+        router.go(n)
+      }
+      // TODO: Check if route object support is needed.
+    }
+    // TODO: Test support for router.resolve and router.getMatchedComponents
+  }
 
   // Makes <translate> available as a global component.
   Vue.component('translate', Component(Vue, marked))

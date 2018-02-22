@@ -250,7 +250,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       }
 
       // Record if the path request came from a normal request or while changing the saved locale.
-      const localeSwitch = to.params._changeLocale
+      const localeSwitch = to.params._localeSwitch
 
       // Helper for defining the `next` object.
       const defineNext = function (name, params) {
@@ -296,7 +296,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       }
 
       // Parse the route when it contains a locale that is not currently selected.
-      if (to.params._locale !== savedLocale) {
+      if (to.params._locale !== savedLocale && !localeSwitch) {
         if (to.meta.localized) {
           if (to.params._locale !== config.defaultLocale) {
             if (config.routingStyle === 'changeLocale') {
@@ -330,7 +330,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
             }
           }
         }
-      } else if (to.params._locale === config.defaultLocale) {
+      } else if (to.params._locale === config.defaultLocale && !localeSwitch) {
         routeDefaultLocale()
       }
 
@@ -372,31 +372,36 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       }
 
       if (this.$i18n.usingRouter && router) {
+        let _next
+
         if (!this.$i18n.defaultLocaleInRoutes && locale === this.$i18n.defaultLocale && this.$route.meta.localized === true) {
-          this.$router.push({
+          _next = {
             name: this.$route.meta.seedRoute.name,
-            params: Object.assign(this.$route.params, { _locale: undefined, _changeLocale: true }),
+            params: Object.assign(this.$route.params, { _locale: undefined, _localeSwitch: true }),
             hash: this.$route.hash,
             query: this.$route.query
-          })
+          }
         } else if (this.$route.meta.localized === true) {
-          this.$router.push({
+          _next = {
             name: this.$route.name,
-            params: Object.assign(this.$route.params, { _locale: locale, _changeLocale: true }),
+            params: Object.assign(this.$route.params, { _locale: locale, _localeSwitch: true }),
             hash: this.$route.hash,
             query: this.$route.query
-          })
+          }
         } else {
-          this.$router.push({
+          _next = {
             name: '__locale:' + this.$route.meta.i18nId,
-            params: Object.assign(this.$route.params, { _locale: locale, _changeLocale: true }),
+            params: Object.assign(this.$route.params, { _locale: locale, _localeSwitch: true }),
             hash: this.$route.hash,
             query: this.$route.query
-          })
+          }
         }
 
         if (this.$i18n.forceReloadOnSwitch) {
+          this.$router.push(_next)
           window.location.reload()
+        } else {
+          this.$router.push(_next)
         }
       } else {
         if (this.$i18n.forceReloadOnSwitch) {
@@ -511,11 +516,11 @@ const parseOptions = (options) => {
     messages: options.messages || {},
     defaultLocale: options.defaultLocale || 'en',
     allLocales: options.allLocales || (options.defaultLocale ? [options.defaultLocale] : ['en']),
-    forceReloadOnSwitch: options.forceReloadOnSwitch || true,
-    usingRouter: options.usingRouter || false,
-    defaultLocaleInRoutes: options.defaultLocaleInRoutes || false,
+    forceReloadOnSwitch: options.forceReloadOnSwitch === undefined ? true : options.forceReloadOnSwitch,
+    usingRouter: options.usingRouter === undefined ? false : options.usingRouter,
+    defaultLocaleInRoutes: options.defaultLocaleInRoutes === undefined ? false : options.defaultLocaleInRoutes,
     routingStyle: options.routingStyle || 'changeLocale',
-    routeAutoPrefix: options.routeAutoPrefix || true,
+    routeAutoPrefix: options.routeAutoPrefix === undefined ? true : options.routeAutoPrefix,
     // TODO: Implement better storageMethod parsing.
     storageMethod: typeof options.storageMethod !== 'object' ? (['session', 'local', 'cookie'].includes(options.storageMethod.trim()) ? options.storageMethod.trim() : 'local') : 'custom',
     storageKey: options.storageKey || '_vue_i18n_gettext_locale',

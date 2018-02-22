@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.7 
+ * vue-i18n-gettext v0.0.8 
  * (c) 2018 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -1097,51 +1097,46 @@ var Component = function (Vue, marked) {
 };
 
 var Directive = function (marked) {
-  return {
-    bind: function bind (el, binding, vnode) {
-      // https://vuejs.org/v2/guide/conditional.html#Controlling-Reusable-Elements-with-key
-      // https://vuejs.org/v2/api/#key
-      if (!vnode.key) {
-        vnode.key = uuid();
-      }
+  var renderTranslation = function (el, binding, vnode, useJustCache) {
+    var self = vnode.context;
+    var attrs = vnode.data.attrs || {};
+    var msgid = el.dataset.i18nCachedMsgid || el.innerHTML;
+    var tContext = attrs['t-context'];
+    var tN = attrs['t-n'];
+    var _tN = tN;
+    var tPlural = attrs['t-plural'];
+    var tParams = attrs['t-params'] || {};
+    var md = attrs['md'];
+    var markdown = attrs['markdown'];
+    var isPlural = tN !== undefined && tPlural !== undefined;
 
-      var self = vnode.context;
-      var attrs = vnode.data.attrs || {};
-      var msgid = el.innerHTML;
-      var tContext = attrs['t-context'];
-      var tN = attrs['t-n'];
-      var _tN = tN;
-      var tPlural = attrs['t-plural'];
-      var tParams = attrs['t-params'] || {};
-      var md = attrs['md'];
-      var markdown = attrs['markdown'];
-      var isPlural = tN !== undefined && tPlural !== undefined;
+    // If there are parameters inside the `v-translate` directive attribute merge them with params.
+    // `vue-translate` values have the priority compared to `t-params`.
+    if (binding.value && typeof binding.value === 'object') {
+      tParams = Object.assign(tParams, binding.value);
+    }
 
-      // If there are parameters inside the `v-translate` directive attribute merge them with params.
-      // `vue-translate` values have the priority compared to `t-params`.
-      if (binding.value && typeof binding.value === 'object') {
-        tParams = Object.assign(tParams, binding.value);
-      }
+    // Replace n with a value from the params if they are set.
+    // If n isn't a string than it's assumed that a numeric value has been passed, and that value will be used
+    // to determine the plural form (instead of the replace).
+    if (_tN && (typeof _tN === 'string') && tParams) {
+      _tN = tN.trim();
 
-      // Replace n with a value from the params if they are set.
-      // If n isn't a string than it's assumed that a numeric value has been passed, and that value will be used
-      // to determine the plural form (instead of the replace).
-      if (_tN && (typeof _tN === 'string') && tParams) {
-        _tN = tN.trim();
-
-        if (tParams.hasOwnProperty(_tN) && tParams[_tN]) {
-          _tN = tParams[_tN];
-        } else {
-          _tN = undefined;
-        }
-      } else if (typeof _tN !== 'number') {
+      if (tParams.hasOwnProperty(_tN) && tParams[_tN]) {
+        _tN = tParams[_tN];
+      } else {
         _tN = undefined;
       }
+    } else if (typeof _tN !== 'number') {
+      _tN = undefined;
+    }
 
-      if (!isPlural && (tN || tPlural)) {
-        throw new Error('`translate-n` and `translate-plural` attributes must be used together:' + msgid + '.')
-      }
+    if (!isPlural && (tN || tPlural)) {
+      throw new Error('`translate-n` and `translate-plural` attributes must be used together:' + msgid + '.')
+    }
 
+    // Cache msgid.
+    if (!el.dataset.i18nCachedMsgid) {
       if (el.innerHTML.trim() !== el.innerText) {
         // Content is HTML.
         // Set the string to be the innerHTML, but striped of white spaces and Vue's automatically added data-v attributes.
@@ -1152,29 +1147,41 @@ var Directive = function (marked) {
         msgid = el.innerText;
       }
 
-      var translation = null;
+      el.dataset.i18nCachedMsgid = msgid;
+    }
 
-      if (isPlural && tContext) {
-        translation = self.$npgettext(tContext, msgid, isPlural ? tPlural : null, _tN);
-      } else if (isPlural) {
-        translation = self.$ngettext(msgid, isPlural ? tPlural : null, _tN);
-      } else if (tContext) {
-        translation = self.$pgettext(tContext, msgid);
-      } else {
-        translation = self.$gettext(msgid);
-      }
+    var translation = null;
 
-      // Interpolate values from the parent component and from the parameters object.
-      translation = self.$_i(translation, Object.assign(self, typeof tParams === 'object' ? tParams : {}));
+    if (isPlural && tContext) {
+      translation = self.$npgettext(tContext, msgid, isPlural ? tPlural : null, _tN);
+    } else if (isPlural) {
+      translation = self.$ngettext(msgid, isPlural ? tPlural : null, _tN);
+    } else if (tContext) {
+      translation = self.$pgettext(tContext, msgid);
+    } else {
+      translation = self.$gettext(msgid);
+    }
 
-      if (marked !== undefined && (markdown !== undefined && markdown !== false) || (md !== undefined && md !== false)) {
-        el.innerHTML = marked(translation);
-      } else {
-        el.innerHTML = translation;
-      }
+    // Interpolate values from the parent component and from the parameters object.
+    translation = self.$_i(translation, Object.assign(self, typeof tParams === 'object' ? tParams : {}));
+
+    if (marked !== undefined && (markdown !== undefined && markdown !== false) || (md !== undefined && md !== false)) {
+      el.innerHTML = marked(translation);
+    } else {
+      el.innerHTML = translation;
+    }
+
+    el.dataset.i18nBoundLocale = self.$i18n.activeLocale;
+  };
+
+  return {
+    bind: function bind (el, binding, vnode) {
+      renderTranslation(el, binding, vnode);
+    },
+    update: function update (el, binding, vnode) {
+      renderTranslation(el, binding, vnode);
     }
   }
-
 };
 
 /*  */
@@ -1420,7 +1427,7 @@ function plugin (Vue, options, router, marked) {
       }
 
       // Record if the path request came from a normal request or while changing the saved locale.
-      var localeSwitch = to.params._changeLocale;
+      var localeSwitch = to.params._localeSwitch;
 
       // Helper for defining the `next` object.
       var defineNext = function (name, params) {
@@ -1466,7 +1473,7 @@ function plugin (Vue, options, router, marked) {
       };
 
       // Parse the route when it contains a locale that is not currently selected.
-      if (to.params._locale !== savedLocale) {
+      if (to.params._locale !== savedLocale && !localeSwitch) {
         if (to.meta.localized) {
           if (to.params._locale !== config.defaultLocale) {
             if (config.routingStyle === 'changeLocale') {
@@ -1500,7 +1507,7 @@ function plugin (Vue, options, router, marked) {
             }
           }
         }
-      } else if (to.params._locale === config.defaultLocale) {
+      } else if (to.params._locale === config.defaultLocale && !localeSwitch) {
         routeDefaultLocale();
       }
 
@@ -1542,31 +1549,36 @@ function plugin (Vue, options, router, marked) {
       }
 
       if (this.$i18n.usingRouter && router) {
+        var _next;
+
         if (!this.$i18n.defaultLocaleInRoutes && locale === this.$i18n.defaultLocale && this.$route.meta.localized === true) {
-          this.$router.push({
+          _next = {
             name: this.$route.meta.seedRoute.name,
-            params: Object.assign(this.$route.params, { _locale: undefined, _changeLocale: true }),
+            params: Object.assign(this.$route.params, { _locale: undefined, _localeSwitch: true }),
             hash: this.$route.hash,
             query: this.$route.query
-          });
+          };
         } else if (this.$route.meta.localized === true) {
-          this.$router.push({
+          _next = {
             name: this.$route.name,
-            params: Object.assign(this.$route.params, { _locale: locale, _changeLocale: true }),
+            params: Object.assign(this.$route.params, { _locale: locale, _localeSwitch: true }),
             hash: this.$route.hash,
             query: this.$route.query
-          });
+          };
         } else {
-          this.$router.push({
+          _next = {
             name: '__locale:' + this.$route.meta.i18nId,
-            params: Object.assign(this.$route.params, { _locale: locale, _changeLocale: true }),
+            params: Object.assign(this.$route.params, { _locale: locale, _localeSwitch: true }),
             hash: this.$route.hash,
             query: this.$route.query
-          });
+          };
         }
 
         if (this.$i18n.forceReloadOnSwitch) {
+          this.$router.push(_next);
           window.location.reload();
+        } else {
+          this.$router.push(_next);
         }
       } else {
         if (this.$i18n.forceReloadOnSwitch) {
@@ -1681,11 +1693,11 @@ var parseOptions = function (options) {
     messages: options.messages || {},
     defaultLocale: options.defaultLocale || 'en',
     allLocales: options.allLocales || (options.defaultLocale ? [options.defaultLocale] : ['en']),
-    forceReloadOnSwitch: options.forceReloadOnSwitch || true,
-    usingRouter: options.usingRouter || false,
-    defaultLocaleInRoutes: options.defaultLocaleInRoutes || false,
+    forceReloadOnSwitch: options.forceReloadOnSwitch === undefined ? true : options.forceReloadOnSwitch,
+    usingRouter: options.usingRouter === undefined ? false : options.usingRouter,
+    defaultLocaleInRoutes: options.defaultLocaleInRoutes === undefined ? false : options.defaultLocaleInRoutes,
     routingStyle: options.routingStyle || 'changeLocale',
-    routeAutoPrefix: options.routeAutoPrefix || true,
+    routeAutoPrefix: options.routeAutoPrefix === undefined ? true : options.routeAutoPrefix,
     // TODO: Implement better storageMethod parsing.
     storageMethod: typeof options.storageMethod !== 'object' ? (['session', 'local', 'cookie'].includes(options.storageMethod.trim()) ? options.storageMethod.trim() : 'local') : 'custom',
     storageKey: options.storageKey || '_vue_i18n_gettext_locale',
@@ -1708,7 +1720,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.7';
+plugin.version = '0.0.8';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

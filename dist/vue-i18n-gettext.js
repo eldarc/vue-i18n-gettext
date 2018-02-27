@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.8 
+ * vue-i18n-gettext v0.0.10 
  * (c) 2018 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -537,7 +537,7 @@ var warn = function (msg, err) {
   }
 };
 
-var isObject = function (obj) {
+var isObject$1 = function (obj) {
   return obj !== null && typeof obj === 'object'
 };
 
@@ -613,7 +613,7 @@ function compile$1 (tokens, values) {
 
   var mode = Array.isArray(values)
     ? 'list'
-    : isObject(values)
+    : isObject$1(values)
       ? 'named'
       : 'unknown';
   if (mode === 'unknown') { return compiled }
@@ -1186,6 +1186,476 @@ var Directive = function (marked) {
   }
 };
 
+/*!
+ * isobject <https://github.com/jonschlinkert/isobject>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+var isobject = function isObject(val) {
+  return val != null && typeof val === 'object' && Array.isArray(val) === false;
+};
+
+function isObjectObject(o) {
+  return isobject(o) === true
+    && Object.prototype.toString.call(o) === '[object Object]';
+}
+
+var isPlainObject = function isPlainObject(o) {
+  var ctor,prot;
+
+  if (isObjectObject(o) === false) { return false; }
+
+  // If has modified constructor
+  ctor = o.constructor;
+  if (typeof ctor !== 'function') { return false; }
+
+  // If has modified prototype
+  prot = ctor.prototype;
+  if (isObjectObject(prot) === false) { return false; }
+
+  // If constructor does not have an Object-specific method
+  if (prot.hasOwnProperty('isPrototypeOf') === false) {
+    return false;
+  }
+
+  // Most likely a plain Object
+  return true;
+};
+
+var isExtendable = function isExtendable(val) {
+  return isPlainObject(val) || typeof val === 'function' || Array.isArray(val);
+};
+
+var isExtendable$2 = function isExtendable$2(val) {
+  return isPlainObject(val) || typeof val === 'function' || Array.isArray(val);
+};
+
+/*!
+ * for-in <https://github.com/jonschlinkert/for-in>
+ *
+ * Copyright (c) 2014-2017, Jon Schlinkert.
+ * Released under the MIT License.
+ */
+
+var forIn = function forIn(obj, fn, thisArg) {
+  for (var key in obj) {
+    if (fn.call(thisArg, obj[key], key, obj) === false) {
+      break;
+    }
+  }
+};
+
+var mixinObject = function mixin(target, objects) {
+  var arguments$1 = arguments;
+
+  if (!isExtendable$2(target)) {
+    throw new TypeError('expected the first argument to be an object');
+  }
+
+  var len = arguments.length;
+  var idx = 0;
+
+  while (++idx < len) {
+    copy(target, arguments$1[idx]);
+  }
+  return target;
+};
+
+/**
+ * copy properties from the source object to the
+ * target object. We don't use `Object.keys` here, since
+ * "mixin" also adds non-enumerable keys.
+ *
+ * @param  {*} `value`
+ * @param  {String} `key`
+ */
+
+function copy(target, obj) {
+  if (isExtendable$2(obj)) {
+    forIn(obj, function(value, key) {
+      target[key] = value;
+    });
+  }
+}
+
+var toString = Object.prototype.toString;
+
+var kindOf = function kindOf(val) {
+  if (val === void 0) { return 'undefined'; }
+  if (val === null) { return 'null'; }
+
+  var type = typeof val;
+  if (type === 'boolean') { return 'boolean'; }
+  if (type === 'string') { return 'string'; }
+  if (type === 'number') { return 'number'; }
+  if (type === 'symbol') { return 'symbol'; }
+  if (type === 'function') {
+    return isGeneratorFn(val) ? 'generatorfunction' : 'function';
+  }
+
+  if (isArray(val)) { return 'array'; }
+  if (isBuffer(val)) { return 'buffer'; }
+  if (isArguments(val)) { return 'arguments'; }
+  if (isDate(val)) { return 'date'; }
+  if (isError(val)) { return 'error'; }
+  if (isRegexp(val)) { return 'regexp'; }
+
+  switch (ctorName(val)) {
+    case 'Symbol': return 'symbol';
+    case 'Promise': return 'promise';
+
+    // Set, Map, WeakSet, WeakMap
+    case 'WeakMap': return 'weakmap';
+    case 'WeakSet': return 'weakset';
+    case 'Map': return 'map';
+    case 'Set': return 'set';
+
+    // 8-bit typed arrays
+    case 'Int8Array': return 'int8array';
+    case 'Uint8Array': return 'uint8array';
+    case 'Uint8ClampedArray': return 'uint8clampedarray';
+
+    // 16-bit typed arrays
+    case 'Int16Array': return 'int16array';
+    case 'Uint16Array': return 'uint16array';
+
+    // 32-bit typed arrays
+    case 'Int32Array': return 'int32array';
+    case 'Uint32Array': return 'uint32array';
+    case 'Float32Array': return 'float32array';
+    case 'Float64Array': return 'float64array';
+  }
+
+  if (isGeneratorObj(val)) {
+    return 'generator';
+  }
+
+  // Non-plain objects
+  type = toString.call(val);
+  switch (type) {
+    case '[object Object]': return 'object';
+    // iterators
+    case '[object Map Iterator]': return 'mapiterator';
+    case '[object Set Iterator]': return 'setiterator';
+    case '[object String Iterator]': return 'stringiterator';
+    case '[object Array Iterator]': return 'arrayiterator';
+  }
+
+  // other
+  return type.slice(8, -1).toLowerCase().replace(/\s/g, '');
+};
+
+function ctorName(val) {
+  return val.constructor ? val.constructor.name : null;
+}
+
+function isArray(val) {
+  if (Array.isArray) { return Array.isArray(val); }
+  return val instanceof Array;
+}
+
+function isError(val) {
+  return val instanceof Error || (typeof val.message === 'string' && val.constructor && typeof val.constructor.stackTraceLimit === 'number');
+}
+
+function isDate(val) {
+  if (val instanceof Date) { return true; }
+  return typeof val.toDateString === 'function'
+    && typeof val.getDate === 'function'
+    && typeof val.setDate === 'function';
+}
+
+function isRegexp(val) {
+  if (val instanceof RegExp) { return true; }
+  return typeof val.flags === 'string'
+    && typeof val.ignoreCase === 'boolean'
+    && typeof val.multiline === 'boolean'
+    && typeof val.global === 'boolean';
+}
+
+function isGeneratorFn(name, val) {
+  return ctorName(name) === 'GeneratorFunction';
+}
+
+function isGeneratorObj(val) {
+  return typeof val.throw === 'function'
+    && typeof val.return === 'function'
+    && typeof val.next === 'function';
+}
+
+function isArguments(val) {
+  try {
+    if (typeof val.length === 'number' && typeof val.callee === 'function') {
+      return true;
+    }
+  } catch (err) {
+    if (err.message.indexOf('callee') !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * If you need to support Safari 5-7 (8-10 yr-old browser),
+ * take a look at https://github.com/feross/is-buffer
+ */
+
+function isBuffer(val) {
+  if (val.constructor && typeof val.constructor.isBuffer === 'function') {
+    return val.constructor.isBuffer(val);
+  }
+  return false;
+}
+
+/**
+ * Shallow copy an object, array or primitive.
+ *
+ * @param  {any} `val`
+ * @return {any}
+ */
+
+function clone(val) {
+  var type = kindOf(val);
+  if (clone.hasOwnProperty(type)) {
+    return clone[type](val);
+  }
+  return val;
+}
+
+clone.array = function cloneArray(arr) {
+  return arr.slice();
+};
+
+clone.date = function cloneDate(date) {
+  return new Date(+date);
+};
+
+clone.object = function cloneObject(obj) {
+  if (isExtendable(obj)) {
+    return mixinObject({}, obj);
+  } else {
+    return obj;
+  }
+};
+
+clone.map = function cloneMap(val) {
+  return new Map(val);
+};
+
+clone.regexp = function cloneRegExp(re) {
+  var flags = '';
+  flags += re.multiline ? 'm' : '';
+  flags += re.global ? 'g' : '';
+  flags += re.ignoreCase ? 'i' : '';
+  return new RegExp(re.source, flags);
+};
+
+clone.set = function cloneSet(val) {
+  return new Set(val);
+};
+
+/**
+ * Expose `clone`
+ */
+
+var shallowClone = clone;
+
+var toString$1 = Object.prototype.toString;
+
+var kindOf$2 = function kindOf$2(val) {
+  if (val === void 0) { return 'undefined'; }
+  if (val === null) { return 'null'; }
+
+  var type = typeof val;
+  if (type === 'boolean') { return 'boolean'; }
+  if (type === 'string') { return 'string'; }
+  if (type === 'number') { return 'number'; }
+  if (type === 'symbol') { return 'symbol'; }
+  if (type === 'function') {
+    return isGeneratorFn$1(val) ? 'generatorfunction' : 'function';
+  }
+
+  if (isArray$1(val)) { return 'array'; }
+  if (isBuffer$1(val)) { return 'buffer'; }
+  if (isArguments$1(val)) { return 'arguments'; }
+  if (isDate$1(val)) { return 'date'; }
+  if (isError$1(val)) { return 'error'; }
+  if (isRegexp$1(val)) { return 'regexp'; }
+
+  switch (ctorName$1(val)) {
+    case 'Symbol': return 'symbol';
+    case 'Promise': return 'promise';
+
+    // Set, Map, WeakSet, WeakMap
+    case 'WeakMap': return 'weakmap';
+    case 'WeakSet': return 'weakset';
+    case 'Map': return 'map';
+    case 'Set': return 'set';
+
+    // 8-bit typed arrays
+    case 'Int8Array': return 'int8array';
+    case 'Uint8Array': return 'uint8array';
+    case 'Uint8ClampedArray': return 'uint8clampedarray';
+
+    // 16-bit typed arrays
+    case 'Int16Array': return 'int16array';
+    case 'Uint16Array': return 'uint16array';
+
+    // 32-bit typed arrays
+    case 'Int32Array': return 'int32array';
+    case 'Uint32Array': return 'uint32array';
+    case 'Float32Array': return 'float32array';
+    case 'Float64Array': return 'float64array';
+  }
+
+  if (isGeneratorObj$1(val)) {
+    return 'generator';
+  }
+
+  // Non-plain objects
+  type = toString$1.call(val);
+  switch (type) {
+    case '[object Object]': return 'object';
+    // iterators
+    case '[object Map Iterator]': return 'mapiterator';
+    case '[object Set Iterator]': return 'setiterator';
+    case '[object String Iterator]': return 'stringiterator';
+    case '[object Array Iterator]': return 'arrayiterator';
+  }
+
+  // other
+  return type.slice(8, -1).toLowerCase().replace(/\s/g, '');
+};
+
+function ctorName$1(val) {
+  return val.constructor ? val.constructor.name : null;
+}
+
+function isArray$1(val) {
+  if (Array.isArray) { return Array.isArray(val); }
+  return val instanceof Array;
+}
+
+function isError$1(val) {
+  return val instanceof Error || (typeof val.message === 'string' && val.constructor && typeof val.constructor.stackTraceLimit === 'number');
+}
+
+function isDate$1(val) {
+  if (val instanceof Date) { return true; }
+  return typeof val.toDateString === 'function'
+    && typeof val.getDate === 'function'
+    && typeof val.setDate === 'function';
+}
+
+function isRegexp$1(val) {
+  if (val instanceof RegExp) { return true; }
+  return typeof val.flags === 'string'
+    && typeof val.ignoreCase === 'boolean'
+    && typeof val.multiline === 'boolean'
+    && typeof val.global === 'boolean';
+}
+
+function isGeneratorFn$1(name, val) {
+  return ctorName$1(name) === 'GeneratorFunction';
+}
+
+function isGeneratorObj$1(val) {
+  return typeof val.throw === 'function'
+    && typeof val.return === 'function'
+    && typeof val.next === 'function';
+}
+
+function isArguments$1(val) {
+  try {
+    if (typeof val.length === 'number' && typeof val.callee === 'function') {
+      return true;
+    }
+  } catch (err) {
+    if (err.message.indexOf('callee') !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * If you need to support Safari 5-7 (8-10 yr-old browser),
+ * take a look at https://github.com/feross/is-buffer
+ */
+
+function isBuffer$1(val) {
+  if (val.constructor && typeof val.constructor.isBuffer === 'function') {
+    return val.constructor.isBuffer(val);
+  }
+  return false;
+}
+
+var hasOwn = Object.prototype.hasOwnProperty;
+
+var forOwn = function forOwn(obj, fn, thisArg) {
+  forIn(obj, function(val, key) {
+    if (hasOwn.call(obj, key)) {
+      return fn.call(thisArg, obj[key], key, obj);
+    }
+  });
+};
+
+/**
+ * Module dependenices
+ */
+
+
+
+
+
+
+/**
+ * Recursively clone native types.
+ */
+
+function cloneDeep(val, instanceClone) {
+  switch (kindOf$2(val)) {
+    case 'object':
+      return cloneObjectDeep(val, instanceClone);
+    case 'array':
+      return cloneArrayDeep(val, instanceClone);
+    default: {
+      return shallowClone(val);
+    }
+  }
+}
+
+function cloneObjectDeep(obj, instanceClone) {
+  if (isPlainObject(obj) || (instanceClone === true && kindOf$2(obj) === 'object')) {
+    var res = {};
+    forOwn(obj, function(val, key) {
+      this[key] = cloneDeep(val, instanceClone);
+    }, res);
+    return res;
+  }
+  if (typeof instanceClone === 'function') {
+    return instanceClone(obj);
+  }
+  return obj;
+}
+
+function cloneArrayDeep(arr, instanceClone) {
+  var res = [];
+  for (var i = 0; i < arr.length; i++) {
+    res[i] = cloneDeep(arr[i], instanceClone);
+  }
+  return res;
+}
+
+/**
+ * Expose `cloneDeep`
+ */
+
+var cloneDeep_1 = cloneDeep;
+
 /*  */
 function plugin (Vue, options, router, marked) {
   if ( options === void 0 ) options = {};
@@ -1225,7 +1695,7 @@ function plugin (Vue, options, router, marked) {
     // Think about how to inject multiple plural values
     if (typeof input === 'object') {
       var self = this;
-      var output = JSON.parse(JSON.stringify(input));
+      var output = JSON.parse(JSON.stringify(input)); // TODO: Improve cloning.
       var nCount = {
         counter: 0,
         getN: function getN () {
@@ -1295,10 +1765,10 @@ function plugin (Vue, options, router, marked) {
         {
           name: _route.name ? _route.name : i18nId,
           path: !config.routeAutoPrefix ? _path(_route.path, '$locale', '') : _route.path,
-          meta: {
+          meta: Object.assign(cloneDeep_1(_route.meta), {
             i18nId: i18nId,
             localized: false
-          }
+          })
         }
       ));
 
@@ -1314,10 +1784,10 @@ function plugin (Vue, options, router, marked) {
               childRoute.meta = {};
             }
 
-            childRoute.meta = {
+            childRoute.meta = Object.assign(cloneDeep_1(childRoute.meta), {
               i18nId: i18nId,
               localized: false
-            };
+            });
 
             if (childRoute.children && childRoute.children.length > 0) {
               modifyChild(childRoute);
@@ -1332,12 +1802,12 @@ function plugin (Vue, options, router, marked) {
         {
           name: '__locale:' + currentSeedRoute.meta.i18nId,
           path: config.routeAutoPrefix ? _path('/:_locale?/' + currentSeedRoute.path) : currentSeedRoute.path,
-          meta: {
+          meta: Object.assign(cloneDeep_1(currentSeedRoute.meta), {
             i18nId: undefined,
             seedI18nId: currentSeedRoute.meta.i18nId,
             localized: true,
             seedRoute: currentSeedRoute
-          },
+          }),
           redirect: currentSeedRoute.redirect ? '/:_locale?' + currentSeedRoute.redirect : undefined
         }
       ));
@@ -1722,7 +2192,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.8';
+plugin.version = '0.0.10';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

@@ -1445,6 +1445,15 @@ cliui@^3.2.0:
     strip-ansi "^3.0.1"
     wrap-ansi "^2.0.0"
 
+clone-deep@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/clone-deep/-/clone-deep-3.0.1.tgz#7d1a4b88a3cf0bc2da84696ba712b349a6506a44"
+  dependencies:
+    for-own "^1.0.0"
+    is-plain-object "^2.0.4"
+    kind-of "^6.0.2"
+    shallow-clone "^2.0.2"
+
 clone@^1.0.2:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/clone/-/clone-1.0.3.tgz#298d7e2231660f40c003c2ed3140decf3f53085f"
@@ -2867,6 +2876,12 @@ for-own@^0.1.4:
   dependencies:
     for-in "^1.0.1"
 
+for-own@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/for-own/-/for-own-1.0.0.tgz#c63332f415cedc4b04dbfe70cf836494c53cb44b"
+  dependencies:
+    for-in "^1.0.1"
+
 foreach@^2.0.5:
   version "2.0.5"
   resolved "https://registry.yarnpkg.com/foreach/-/foreach-2.0.5.tgz#0bee005018aeb260d0a3af3ae658dd0136ec1b99"
@@ -3770,7 +3785,7 @@ is-extendable@^0.1.0, is-extendable@^0.1.1:
   version "0.1.1"
   resolved "https://registry.yarnpkg.com/is-extendable/-/is-extendable-0.1.1.tgz#62b110e289a471418e3ec36a617d472e301dfc89"
 
-is-extendable@^1.0.1:
+is-extendable@^1.0.0, is-extendable@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/is-extendable/-/is-extendable-1.0.1.tgz#a7470f9e426733d81bd81e1155264e3a3507cab4"
   dependencies:
@@ -4721,6 +4736,13 @@ mixin-deep@^1.2.0:
   dependencies:
     for-in "^1.0.2"
     is-extendable "^1.0.1"
+
+mixin-object@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/mixin-object/-/mixin-object-3.0.0.tgz#55091196c9cf744f4c7956fb7021da38c736c440"
+  dependencies:
+    for-in "^1.0.2"
+    is-extendable "^1.0.0"
 
 mkdirp@0.5.1, mkdirp@0.5.x, "mkdirp@>=0.5 0", mkdirp@^0.5.0, mkdirp@^0.5.1, mkdirp@~0.5.0, mkdirp@~0.5.1:
   version "0.5.1"
@@ -6890,6 +6912,14 @@ sha@~2.0.1:
   dependencies:
     graceful-fs "^4.1.2"
     readable-stream "^2.0.2"
+
+shallow-clone@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/shallow-clone/-/shallow-clone-2.0.2.tgz#7f6e9cf3b64e37d5f4afb0f648a0204da556b872"
+  dependencies:
+    is-extendable "^1.0.1"
+    kind-of "^6.0.2"
+    mixin-object "^3.0.0"
 
 shebang-command@^1.2.0:
   version "1.2.0"

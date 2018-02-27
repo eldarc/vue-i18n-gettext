@@ -5,6 +5,7 @@ import Component from './component'
 import Directive from './directive'
 import { warn } from './util'
 import uuid from './uuid'
+import cloneDeep from 'clone-deep'
 
 /* @flow */
 function plugin (Vue: any, options: Object = {}, router, marked) {
@@ -42,7 +43,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
     // Think about how to inject multiple plural values
     if (typeof input === 'object') {
       const self = this
-      const output = JSON.parse(JSON.stringify(input))
+      const output = JSON.parse(JSON.stringify(input)) // TODO: Improve cloning.
       const nCount = {
         counter: 0,
         getN () {
@@ -114,10 +115,10 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
         {
           name: _route.name ? _route.name : i18nId,
           path: !config.routeAutoPrefix ? _path(_route.path, '$locale', '') : _route.path,
-          meta: {
+          meta: Object.assign(cloneDeep(_route.meta), {
             i18nId: i18nId,
             localized: false
-          }
+          })
         }
       ))
 
@@ -133,10 +134,10 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
               childRoute.meta = {}
             }
 
-            childRoute.meta = {
+            childRoute.meta = Object.assign(cloneDeep(childRoute.meta), {
               i18nId: i18nId,
               localized: false
-            }
+            })
 
             if (childRoute.children && childRoute.children.length > 0) {
               modifyChild(childRoute)
@@ -151,12 +152,12 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
         {
           name: '__locale:' + currentSeedRoute.meta.i18nId,
           path: config.routeAutoPrefix ? _path('/:_locale?/' + currentSeedRoute.path) : currentSeedRoute.path,
-          meta: {
+          meta: Object.assign(cloneDeep(currentSeedRoute.meta), {
             i18nId: undefined,
             seedI18nId: currentSeedRoute.meta.i18nId,
             localized: true,
             seedRoute: currentSeedRoute
-          },
+          }),
           redirect: currentSeedRoute.redirect ? '/:_locale?' + currentSeedRoute.redirect : undefined
         }
       ))
@@ -167,7 +168,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       if (currentLocaleRoute.children && currentLocaleRoute.children.length > 0) {
         // Duplicate the children array, and then restore references to the original child except for
         // following keys: children, meta.
-        const childrenInstance = JSON.parse(JSON.stringify(currentLocaleRoute.children))
+        const childrenInstance = JSON.parse(JSON.stringify(currentLocaleRoute.children)) // TODO: Improve cloning.
 
         ;(function adjustLocaleSubroutes (currentRoutes, childrenReference) {
           currentRoutes.forEach((childRoute, i) => {

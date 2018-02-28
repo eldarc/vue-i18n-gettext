@@ -3162,7 +3162,6 @@ function plugin (Vue, options, router, marked) {
 
     // Add new routes.
     router.addRoutes(_modifiedRoutes);
-    console.log(_modifiedRoutes);
 
     // Inject the gettext router guard to the router.
     router.beforeEach(function (to, from, next) {

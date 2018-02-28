@@ -5,7 +5,7 @@ import Component from './component'
 import Directive from './directive'
 import { warn } from './util'
 import uuid from './uuid'
-import cloneDeep from 'clone-deep'
+import cloneDeep from 'lodash.clonedeep'
 
 /* @flow */
 function plugin (Vue: any, options: Object = {}, router, marked) {
@@ -43,7 +43,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
     // Think about how to inject multiple plural values
     if (typeof input === 'object') {
       const self = this
-      const output = JSON.parse(JSON.stringify(input)) // TODO: Improve cloning.
+      const output = cloneDeep(input)
       const nCount = {
         counter: 0,
         getN () {
@@ -168,7 +168,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       if (currentLocaleRoute.children && currentLocaleRoute.children.length > 0) {
         // Duplicate the children array, and then restore references to the original child except for
         // following keys: children, meta.
-        const childrenInstance = JSON.parse(JSON.stringify(currentLocaleRoute.children)) // TODO: Improve cloning.
+        const childrenInstance = cloneDeep(currentLocaleRoute.children)
 
         ;(function adjustLocaleSubroutes (currentRoutes, childrenReference) {
           currentRoutes.forEach((childRoute, i) => {
@@ -219,6 +219,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
 
     // Add new routes.
     router.addRoutes(_modifiedRoutes)
+    console.log(_modifiedRoutes)
 
     // Inject the gettext router guard to the router.
     router.beforeEach((to, from, next) => {

@@ -5,9 +5,8 @@ Got a question?
 ===============
 The issue list of this repo is **exclusively** for bug reports and feature requests. For simple questions, please use the following resources:
 
-- Read the docs: https://github.com/eldarc/vue-i18n-gettext/blob/dev/README.md
-- Ask in the Gitter chat room: https://gitter.im/vuejs/vue
-- Ask on the forums: http://forum.vuejs.org/
+- Read the docs (in the works): https://github.com/eldarc/vue-i18n-gettext/blob/dev/README.md
+- Ask on the Vue Discord server: https://vue-land.js.org/
 - Look for/ask questions on stack overflow: https://stackoverflow.com/questions/ask?tags=vue-i18n-gettext
 
 Reporting a bug?

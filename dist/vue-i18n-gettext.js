@@ -2957,6 +2957,59 @@ module.exports = cloneDeep;
 function plugin (Vue, options, router, marked) {
   if ( options === void 0 ) options = {};
 
+  // Expose date and number formating methods.
+  // TODO: Make a shared function for all three methods.
+  var _formatNumber = function (number, options) {
+    if (number) {
+      if (typeof options === 'object') {
+        options = Object.assign(this.$i18n.numberFormat, options);
+      } else {
+        options = undefined;
+      }
+
+      var _number = options ? new Intl.NumberFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.NUMBER_FORMATTER.format(number);
+      return _number
+    }
+
+    return number
+  };
+  Vue.prototype.$number = _formatNumber;
+  Vue.prototype.$_n = _formatNumber;
+
+  var _formatCurrency = function (number, options) {
+    if (number) {
+      if (typeof options === 'object') {
+        options = Object.assign(this.$i18n.numberFormat, options);
+      } else {
+        options = undefined;
+      }
+
+      var _number = options ? new Intl.CurrencyFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.CURRENCY_FORMATTER.format(number);
+      return _number
+    }
+
+    return number
+  };
+  Vue.prototype.$currency = _formatCurrency;
+  Vue.prototype.$_c = _formatCurrency;
+
+  var _formatDate = function (date, options) {
+    if (date) {
+      if (typeof options === 'object') {
+        options = Object.assign(this.$i18n.numberFormat, options);
+      } else {
+        options = undefined;
+      }
+
+      var _date = options ? new Intl.DateTimeFormat(this.$i18n.activeLocale, options).format(date) : this.$i18n.DATE_TIME_FORMATTER.format(date);
+      return _date
+    }
+
+    return date
+  };
+  Vue.prototype.$date = _formatDate;
+  Vue.prototype.$_d = _formatDate;
+
   // Expose gettext functions.
   Vue.prototype.$gettext = gettextFunctions._gettext;
   Vue.prototype.$pgettext = gettextFunctions._pgettext;
@@ -3062,7 +3115,7 @@ function plugin (Vue, options, router, marked) {
         {
           name: _route.name ? _route.name : i18nId,
           path: !config.routeAutoPrefix ? _path(_route.path, '$locale', '') : _route.path,
-          meta: Object.assign(lodash_clonedeep(_route.meta), {
+          meta: Object.assign(lodash_clonedeep(_route.meta || {}), {
             i18nId: i18nId,
             localized: false
           })
@@ -3081,7 +3134,7 @@ function plugin (Vue, options, router, marked) {
               childRoute.meta = {};
             }
 
-            childRoute.meta = Object.assign(lodash_clonedeep(childRoute.meta), {
+            childRoute.meta = Object.assign(lodash_clonedeep(childRoute.meta || {}), {
               i18nId: i18nId,
               localized: false
             });
@@ -3099,7 +3152,7 @@ function plugin (Vue, options, router, marked) {
         {
           name: '__locale:' + currentSeedRoute.meta.i18nId,
           path: config.routeAutoPrefix ? _path('/:_locale?/' + currentSeedRoute.path) : currentSeedRoute.path,
-          meta: Object.assign(lodash_clonedeep(currentSeedRoute.meta), {
+          meta: Object.assign(lodash_clonedeep(currentSeedRoute.meta || {}), {
             i18nId: undefined,
             seedI18nId: currentSeedRoute.meta.i18nId,
             localized: true,
@@ -3115,7 +3168,7 @@ function plugin (Vue, options, router, marked) {
       if (currentLocaleRoute.children && currentLocaleRoute.children.length > 0) {
         // Duplicate the children array, and then restore references to the original child except for
         // following keys: children, meta.
-        var childrenInstance = lodash_clonedeep(currentLocaleRoute.children);(function adjustLocaleSubroutes (currentRoutes, childrenReference) {
+        var childrenInstance = lodash_clonedeep(currentLocaleRoute.children || []);(function adjustLocaleSubroutes (currentRoutes, childrenReference) {
           currentRoutes.forEach(function (childRoute, i) {
             var objectKeys = Object.keys(childRoute);
 
@@ -3293,11 +3346,47 @@ function plugin (Vue, options, router, marked) {
   Vue.prototype.$i18n = new Vue({
     data: function data () {
       config.activeLocale = savedLocale && savedLocale !== config.defaultLocale ? savedLocale : config.defaultLocale;
+
+      config.activeCurrency = config.currencies[config.activeLocale] ? config.currencies[config.activeLocale] : config.defaultCurrency;
+      config.currencyFormat = config.currencyFormats[config.activeLocale] ? Object.assign(config.currencyFormats[config.activeLocale], { style: 'currency', currency: config.activeCurrency }) : Object.assign(config.currencyFormat, { style: 'currency', currency: config.activeCurrency });
+
+      if (config.currencyLocaleFormats[config.activeLocale]) {
+        config.currencyFormat = Object.assign(config.currencyFormat, config.currencyLocaleFormats[config.activeLocale]);
+      }
+
+      config.NUMBER_FORMATTER = new Intl.NumberFormat(config.activeLocale, config.numberFormats[config.activeLocale] ? config.numberFormats[config.activeLocale] : config.numberFormat);
+      config.CURRENCY_FORMATTER = new Intl.NumberFormat(config.activeLocale, config.currencyFormats[config.activeLocale] ? config.currencyFormats[config.activeLocale] : config.currencyFormat);
+      config.DATE_TIME_FORMATTER = new Intl.DateTimeFormat(config.activeLocale, config.dateFormats[config.activeLocale] ? config.dateFormats[config.activeLocale] : config.dateFormat);
+
       return config
+    },
+    watch: {
+      activeLocale: function activeLocale () {
+        this.NUMBER_FORMATTER = new Intl.NumberFormat(config.activeLocale, this.numberFormats[this.activeLocale] ? this.numberFormats[this.activeLocale] : this.numberFormat);
+        this.DATE_TIME_FORMATTER = new Intl.DateTimeFormat(this.activeLocale, this.dateFormats[this.activeLocale] ? this.dateFormats[this.activeLocale] : this.dateFormat);
+
+        if (!this.persistCurrency) {
+          this.activeCurrency = this.currencies[config.activeLocale] ? this.currencies[config.activeLocale] : this.defaultCurrency;
+        } else {
+          this.updateCurrency(this.activeCurrency);
+        }
+      },
+      activeCurrency: function activeCurrency (newCurrency) {
+        this.updateCurrency(newCurrency);
+      }
     },
     methods: {
       getLocaleMessage: function getLocaleMessage (key) {
         return this.messages[key]
+      },
+      updateCurrency: function updateCurrency (newCurrency) {
+        this.currencyFormat = this.currencyFormats[this.activeLocale] ? Object.assign(this.currencyFormats[this.activeLocale], { style: 'currency', currency: newCurrency }) : Object.assign(this.currencyFormat, { style: 'currency', currency: newCurrency });
+
+        if (this.currencyLocaleFormats[this.activeLocale]) {
+          this.currencyFormat = Object.assign(this.currencyFormat, this.currencyLocaleFormats[this.activeLocale]);
+        }
+
+        this.CURRENCY_FORMATTER = new Intl.NumberFormat(config.activeLocale, this.currencyFormats[this.activeLocale] ? this.currencyFormats[this.activeLocale] : this.currencyFormat);
       }
     }
   });
@@ -3460,6 +3549,16 @@ var switchMethods = {
 var parseOptions = function (options) {
   var _options = {
     messages: options.messages || {},
+    numberFormat: options.numberFormat || {},
+    currencyFormat: options.currencyFormat || {},
+    dateFormat: options.dateFormat || {},
+    numberFormats: options.numberFormats || {},
+    currencyFormats: options.currencyFormats || {},
+    currencyLocaleFormats: options.currencyLocaleFormats || {},
+    dateFormats: options.dateFormats || {},
+    defaultCurrency: options.defaultCurrency || 'USD',
+    currencies: options.currencies || {},
+    persistCurrency: options.persistCurrency === undefined ? true : options.persistCurrency,
     defaultLocale: options.defaultLocale || 'en',
     allLocales: options.allLocales || (options.defaultLocale ? [options.defaultLocale] : ['en']),
     forceReloadOnSwitch: options.forceReloadOnSwitch === undefined ? true : options.forceReloadOnSwitch,

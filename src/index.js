@@ -9,6 +9,59 @@ import cloneDeep from 'lodash.clonedeep'
 
 /* @flow */
 function plugin (Vue: any, options: Object = {}, router, marked) {
+  // Expose date and number formating methods.
+  // TODO: Make a shared function for all three methods.
+  const _formatNumber = function (number, options) {
+    if (number) {
+      if (typeof options === 'object') {
+        options = Object.assign(this.$i18n.numberFormat, options)
+      } else {
+        options = undefined
+      }
+
+      const _number = options ? new Intl.NumberFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.NUMBER_FORMATTER.format(number)
+      return _number
+    }
+
+    return number
+  }
+  Vue.prototype.$number = _formatNumber
+  Vue.prototype.$_n = _formatNumber
+
+  const _formatCurrency = function (number, options) {
+    if (number) {
+      if (typeof options === 'object') {
+        options = Object.assign(this.$i18n.numberFormat, options)
+      } else {
+        options = undefined
+      }
+
+      const _number = options ? new Intl.CurrencyFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.CURRENCY_FORMATTER.format(number)
+      return _number
+    }
+
+    return number
+  }
+  Vue.prototype.$currency = _formatCurrency
+  Vue.prototype.$_c = _formatCurrency
+
+  const _formatDate = function (date, options) {
+    if (date) {
+      if (typeof options === 'object') {
+        options = Object.assign(this.$i18n.numberFormat, options)
+      } else {
+        options = undefined
+      }
+
+      const _date = options ? new Intl.DateTimeFormat(this.$i18n.activeLocale, options).format(date) : this.$i18n.DATE_TIME_FORMATTER.format(date)
+      return _date
+    }
+
+    return date
+  }
+  Vue.prototype.$date = _formatDate
+  Vue.prototype.$_d = _formatDate
+
   // Expose gettext functions.
   Vue.prototype.$gettext = gettextFunctions._gettext
   Vue.prototype.$pgettext = gettextFunctions._pgettext
@@ -115,7 +168,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
         {
           name: _route.name ? _route.name : i18nId,
           path: !config.routeAutoPrefix ? _path(_route.path, '$locale', '') : _route.path,
-          meta: Object.assign(cloneDeep(_route.meta), {
+          meta: Object.assign(cloneDeep(_route.meta || {}), {
             i18nId: i18nId,
             localized: false
           })
@@ -134,7 +187,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
               childRoute.meta = {}
             }
 
-            childRoute.meta = Object.assign(cloneDeep(childRoute.meta), {
+            childRoute.meta = Object.assign(cloneDeep(childRoute.meta || {}), {
               i18nId: i18nId,
               localized: false
             })
@@ -152,7 +205,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
         {
           name: '__locale:' + currentSeedRoute.meta.i18nId,
           path: config.routeAutoPrefix ? _path('/:_locale?/' + currentSeedRoute.path) : currentSeedRoute.path,
-          meta: Object.assign(cloneDeep(currentSeedRoute.meta), {
+          meta: Object.assign(cloneDeep(currentSeedRoute.meta || {}), {
             i18nId: undefined,
             seedI18nId: currentSeedRoute.meta.i18nId,
             localized: true,
@@ -168,7 +221,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       if (currentLocaleRoute.children && currentLocaleRoute.children.length > 0) {
         // Duplicate the children array, and then restore references to the original child except for
         // following keys: children, meta.
-        const childrenInstance = cloneDeep(currentLocaleRoute.children)
+        const childrenInstance = cloneDeep(currentLocaleRoute.children || [])
 
         ;(function adjustLocaleSubroutes (currentRoutes, childrenReference) {
           currentRoutes.forEach((childRoute, i) => {
@@ -348,11 +401,47 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
   Vue.prototype.$i18n = new Vue({
     data () {
       config.activeLocale = savedLocale && savedLocale !== config.defaultLocale ? savedLocale : config.defaultLocale
+
+      config.activeCurrency = config.currencies[config.activeLocale] ? config.currencies[config.activeLocale] : config.defaultCurrency
+      config.currencyFormat = config.currencyFormats[config.activeLocale] ? Object.assign(config.currencyFormats[config.activeLocale], { style: 'currency', currency: config.activeCurrency }) : Object.assign(config.currencyFormat, { style: 'currency', currency: config.activeCurrency })
+
+      if (config.currencyLocaleFormats[config.activeLocale]) {
+        config.currencyFormat = Object.assign(config.currencyFormat, config.currencyLocaleFormats[config.activeLocale])
+      }
+
+      config.NUMBER_FORMATTER = new Intl.NumberFormat(config.activeLocale, config.numberFormats[config.activeLocale] ? config.numberFormats[config.activeLocale] : config.numberFormat)
+      config.CURRENCY_FORMATTER = new Intl.NumberFormat(config.activeLocale, config.currencyFormats[config.activeLocale] ? config.currencyFormats[config.activeLocale] : config.currencyFormat)
+      config.DATE_TIME_FORMATTER = new Intl.DateTimeFormat(config.activeLocale, config.dateFormats[config.activeLocale] ? config.dateFormats[config.activeLocale] : config.dateFormat)
+
       return config
+    },
+    watch: {
+      activeLocale () {
+        this.NUMBER_FORMATTER = new Intl.NumberFormat(config.activeLocale, this.numberFormats[this.activeLocale] ? this.numberFormats[this.activeLocale] : this.numberFormat)
+        this.DATE_TIME_FORMATTER = new Intl.DateTimeFormat(this.activeLocale, this.dateFormats[this.activeLocale] ? this.dateFormats[this.activeLocale] : this.dateFormat)
+
+        if (!this.persistCurrency) {
+          this.activeCurrency = this.currencies[config.activeLocale] ? this.currencies[config.activeLocale] : this.defaultCurrency
+        } else {
+          this.updateCurrency(this.activeCurrency)
+        }
+      },
+      activeCurrency (newCurrency) {
+        this.updateCurrency(newCurrency)
+      }
     },
     methods: {
       getLocaleMessage (key) {
         return this.messages[key]
+      },
+      updateCurrency (newCurrency) {
+        this.currencyFormat = this.currencyFormats[this.activeLocale] ? Object.assign(this.currencyFormats[this.activeLocale], { style: 'currency', currency: newCurrency }) : Object.assign(this.currencyFormat, { style: 'currency', currency: newCurrency })
+
+        if (this.currencyLocaleFormats[this.activeLocale]) {
+          this.currencyFormat = Object.assign(this.currencyFormat, this.currencyLocaleFormats[this.activeLocale])
+        }
+
+        this.CURRENCY_FORMATTER = new Intl.NumberFormat(config.activeLocale, this.currencyFormats[this.activeLocale] ? this.currencyFormats[this.activeLocale] : this.currencyFormat)
       }
     }
   })
@@ -515,6 +604,16 @@ const switchMethods = {
 const parseOptions = (options) => {
   const _options = {
     messages: options.messages || {},
+    numberFormat: options.numberFormat || {},
+    currencyFormat: options.currencyFormat || {},
+    dateFormat: options.dateFormat || {},
+    numberFormats: options.numberFormats || {},
+    currencyFormats: options.currencyFormats || {},
+    currencyLocaleFormats: options.currencyLocaleFormats || {},
+    dateFormats: options.dateFormats || {},
+    defaultCurrency: options.defaultCurrency || 'USD',
+    currencies: options.currencies || {},
+    persistCurrency: options.persistCurrency === undefined ? true : options.persistCurrency,
     defaultLocale: options.defaultLocale || 'en',
     allLocales: options.allLocales || (options.defaultLocale ? [options.defaultLocale] : ['en']),
     forceReloadOnSwitch: options.forceReloadOnSwitch === undefined ? true : options.forceReloadOnSwitch,

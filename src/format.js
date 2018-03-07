@@ -52,7 +52,7 @@ export function parse (format: string): Array<Token> {
           ? 'named'
           : 'unknown'
       tokens.push({ value: sub, type })
-    } else if (char === '$') {
+    } else if (char === '%') {
       // when found rails i18n syntax, skip text capture
       if (format[(position)] !== '{') {
         text += char

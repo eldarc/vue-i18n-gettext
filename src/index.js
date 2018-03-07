@@ -9,55 +9,58 @@ import cloneDeep from 'lodash.clonedeep'
 
 /* @flow */
 function plugin (Vue: any, options: Object = {}, router, marked) {
-  // Expose date and number formating methods.
-  // TODO: Make a shared function for all three methods.
-  const _formatNumber = function (number, options) {
-    if (number) {
+  // Expose date and number formatting methods.
+  const _formatValues = function (context, type, value, options) {
+    let FORMATTER
+
+    switch (type) {
+      case 'number':
+        FORMATTER = {
+          constructor: Intl.NumberFormat,
+          cachedInstance: context.$i18n.NUMBER_FORMATTER
+        }
+        break
+      case 'currency':
+        FORMATTER = {
+          constructor: Intl.CurrencyFormat,
+          cachedInstance: context.$i18n.CURRENCY_FORMATTER
+        }
+        break
+      case 'date':
+        FORMATTER = {
+          constructor: Intl.DateTimeFormat,
+          cachedInstance: context.$i18n.DATE_TIME_FORMATTER
+        }
+        break
+    }
+
+    if (FORMATTER && value) {
       if (typeof options === 'object') {
-        options = Object.assign(this.$i18n.numberFormat, options)
+        options = Object.assign(context.$i18n[`${type}Format`], options)
       } else {
         options = undefined
       }
 
-      const _number = options ? new Intl.NumberFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.NUMBER_FORMATTER.format(number)
-      return _number
+      return options ? new FORMATTER.constructor(context.$i18n.activeLocale, options).format(value) : FORMATTER.cachedInstance.format(value)
+    } else {
+      return value
     }
+  }
 
-    return number
+  const _formatNumber = function (number, options) {
+    return _formatValues(this, 'number', number, options)
   }
   Vue.prototype.$number = _formatNumber
   Vue.prototype.$_n = _formatNumber
 
-  const _formatCurrency = function (number, options) {
-    if (number) {
-      if (typeof options === 'object') {
-        options = Object.assign(this.$i18n.numberFormat, options)
-      } else {
-        options = undefined
-      }
-
-      const _number = options ? new Intl.CurrencyFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.CURRENCY_FORMATTER.format(number)
-      return _number
-    }
-
-    return number
+  const _formatCurrency = function (value, options) {
+    return _formatValues(this, 'currency', value, options)
   }
   Vue.prototype.$currency = _formatCurrency
   Vue.prototype.$_c = _formatCurrency
 
   const _formatDate = function (date, options) {
-    if (date) {
-      if (typeof options === 'object') {
-        options = Object.assign(this.$i18n.numberFormat, options)
-      } else {
-        options = undefined
-      }
-
-      const _date = options ? new Intl.DateTimeFormat(this.$i18n.activeLocale, options).format(date) : this.$i18n.DATE_TIME_FORMATTER.format(date)
-      return _date
-    }
-
-    return date
+    return _formatValues(this, 'currency', date, options)
   }
   Vue.prototype.$date = _formatDate
   Vue.prototype.$_d = _formatDate

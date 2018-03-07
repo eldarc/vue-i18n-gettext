@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.11 
+ * vue-i18n-gettext v0.0.14 
  * (c) 2018 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -590,7 +590,7 @@ function parse$1 (format) {
           ? 'named'
           : 'unknown';
       tokens.push({ value: sub, type: type });
-    } else if (char === '$') {
+    } else if (char === '%') {
       // when found rails i18n syntax, skip text capture
       if (format[(position)] !== '{') {
         text += char;
@@ -2955,55 +2955,58 @@ module.exports = cloneDeep;
 function plugin (Vue, options, router, marked) {
   if ( options === void 0 ) options = {};
 
-  // Expose date and number formating methods.
-  // TODO: Make a shared function for all three methods.
-  var _formatNumber = function (number, options) {
-    if (number) {
+  // Expose date and number formatting methods.
+  var _formatValues = function (context, type, value, options) {
+    var FORMATTER;
+
+    switch (type) {
+      case 'number':
+        FORMATTER = {
+          constructor: Intl.NumberFormat,
+          cachedInstance: context.$i18n.NUMBER_FORMATTER
+        };
+        break
+      case 'currency':
+        FORMATTER = {
+          constructor: Intl.CurrencyFormat,
+          cachedInstance: context.$i18n.CURRENCY_FORMATTER
+        };
+        break
+      case 'date':
+        FORMATTER = {
+          constructor: Intl.DateTimeFormat,
+          cachedInstance: context.$i18n.DATE_TIME_FORMATTER
+        };
+        break
+    }
+
+    if (FORMATTER && value) {
       if (typeof options === 'object') {
-        options = Object.assign(this.$i18n.numberFormat, options);
+        options = Object.assign(context.$i18n[(type + "Format")], options);
       } else {
         options = undefined;
       }
 
-      var _number = options ? new Intl.NumberFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.NUMBER_FORMATTER.format(number);
-      return _number
+      return options ? new FORMATTER.constructor(context.$i18n.activeLocale, options).format(value) : FORMATTER.cachedInstance.format(value)
+    } else {
+      return value
     }
+  };
 
-    return number
+  var _formatNumber = function (number, options) {
+    return _formatValues(this, 'number', number, options)
   };
   Vue.prototype.$number = _formatNumber;
   Vue.prototype.$_n = _formatNumber;
 
-  var _formatCurrency = function (number, options) {
-    if (number) {
-      if (typeof options === 'object') {
-        options = Object.assign(this.$i18n.numberFormat, options);
-      } else {
-        options = undefined;
-      }
-
-      var _number = options ? new Intl.CurrencyFormat(this.$i18n.activeLocale, options).format(number) : this.$i18n.CURRENCY_FORMATTER.format(number);
-      return _number
-    }
-
-    return number
+  var _formatCurrency = function (value, options) {
+    return _formatValues(this, 'currency', value, options)
   };
   Vue.prototype.$currency = _formatCurrency;
   Vue.prototype.$_c = _formatCurrency;
 
   var _formatDate = function (date, options) {
-    if (date) {
-      if (typeof options === 'object') {
-        options = Object.assign(this.$i18n.numberFormat, options);
-      } else {
-        options = undefined;
-      }
-
-      var _date = options ? new Intl.DateTimeFormat(this.$i18n.activeLocale, options).format(date) : this.$i18n.DATE_TIME_FORMATTER.format(date);
-      return _date
-    }
-
-    return date
+    return _formatValues(this, 'currency', date, options)
   };
   Vue.prototype.$date = _formatDate;
   Vue.prototype.$_d = _formatDate;
@@ -3586,7 +3589,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.11';
+plugin.version = '0.0.14';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

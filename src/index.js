@@ -60,7 +60,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
   Vue.prototype.$_c = _formatCurrency
 
   const _formatDate = function (date, options) {
-    return _formatValues(this, 'currency', date, options)
+    return _formatValues(this, 'date', date, options)
   }
   Vue.prototype.$date = _formatDate
   Vue.prototype.$_d = _formatDate

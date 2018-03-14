@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.14 
+ * vue-i18n-gettext v0.0.15 
  * (c) 2018 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -3006,7 +3006,7 @@ function plugin (Vue, options, router, marked) {
   Vue.prototype.$_c = _formatCurrency;
 
   var _formatDate = function (date, options) {
-    return _formatValues(this, 'currency', date, options)
+    return _formatValues(this, 'date', date, options)
   };
   Vue.prototype.$date = _formatDate;
   Vue.prototype.$_d = _formatDate;
@@ -3589,7 +3589,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.14';
+plugin.version = '0.0.15';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

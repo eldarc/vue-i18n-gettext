@@ -507,6 +507,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
   // Converts a router link to the version of the current locale.
   const _localeLink = function (location) {
     if (typeof location === 'string') {
+      const isRelative = location.charAt(0) !== '/'
       let toPath
       if (this.$i18n.routeAutoPrefix) {
         toPath = pathToRegexp.compile(_path('/:_locale?/' + location))
@@ -515,7 +516,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
       }
 
       const path = toPath({ _locale: this.$i18n.activeLocale === this.$i18n.defaultLocale ? (this.$i18n.defaultLocaleInRoutes ? this.$i18n.activeLocale : undefined) : this.$i18n.activeLocale })
-      return path === '' ? '/' : path
+      return path === '' ? '/' : isRelative ? path.substr(1) : path
     } else {
       return location
     }

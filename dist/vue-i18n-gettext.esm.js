@@ -3446,6 +3446,7 @@ function plugin (Vue, options, router, marked) {
   // Converts a router link to the version of the current locale.
   var _localeLink = function (location) {
     if (typeof location === 'string') {
+      var isRelative = location.charAt(0) !== '/';
       var toPath;
       if (this.$i18n.routeAutoPrefix) {
         toPath = pathToRegexp_1.compile(_path('/:_locale?/' + location));
@@ -3454,7 +3455,7 @@ function plugin (Vue, options, router, marked) {
       }
 
       var path = toPath({ _locale: this.$i18n.activeLocale === this.$i18n.defaultLocale ? (this.$i18n.defaultLocaleInRoutes ? this.$i18n.activeLocale : undefined) : this.$i18n.activeLocale });
-      return path === '' ? '/' : path
+      return path === '' ? '/' : isRelative ? path.substr(1) : path
     } else {
       return location
     }

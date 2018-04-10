@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.15 
+ * vue-i18n-gettext v0.0.16 
  * (c) 2018 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -3219,6 +3219,17 @@ function plugin (Vue, options, router, marked) {
     router.beforeEach(function (to, from, next) {
       var actualTo;
 
+      if (config.routingStyle === 'changeLocale') {
+        // Load the saved locale.
+        // TODO: Move load and save of stored keys to helper functions.
+        savedLocale;
+        if (config.storageMethod !== 'custom') {
+          savedLocale = switchMethods[config.storageMethod].load(config.storageKey) || config.defaultLocale;
+        } else {
+          savedLocale = config.storageFunctions.load(config.storageKey) || config.defaultLocale;
+        }
+      }
+
       // Have always a locale set.
       if (!to.params._locale) {
         to.params._locale = config.defaultLocale;
@@ -3586,7 +3597,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.15';
+plugin.version = '0.0.16';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

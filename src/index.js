@@ -280,6 +280,17 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
     router.beforeEach((to, from, next) => {
       let actualTo
 
+      if (config.routingStyle === 'changeLocale') {
+        // Load the saved locale.
+        // TODO: Move load and save of stored keys to helper functions.
+        savedLocale
+        if (config.storageMethod !== 'custom') {
+          savedLocale = switchMethods[config.storageMethod].load(config.storageKey) || config.defaultLocale
+        } else {
+          savedLocale = config.storageFunctions.load(config.storageKey) || config.defaultLocale
+        }
+      }
+
       // Have always a locale set.
       if (!to.params._locale) {
         to.params._locale = config.defaultLocale

@@ -1,5 +1,5 @@
 /*!
- * vue-i18n-gettext v0.0.16 
+ * vue-i18n-gettext v0.0.18 
  * (c) 2018 Eldar Cejvanovic
  * Released under the MIT License.
  */
@@ -2980,7 +2980,7 @@ function plugin (Vue, options, router, marked) {
         break
     }
 
-    if (FORMATTER && value) {
+    if (FORMATTER && value !== undefined && value !== null && value !== false) {
       if (typeof options === 'object') {
         options = Object.assign(context.$i18n[(type + "Format")], options);
       } else {
@@ -3006,6 +3006,12 @@ function plugin (Vue, options, router, marked) {
   Vue.prototype.$_c = _formatCurrency;
 
   var _formatDate = function (date, options) {
+    // Convert unix timestamp to date.
+    // TODO: Make this toggleable trough config.
+    if (Number.isInteger(date)) {
+      date = new Date(date * 1000);
+    }
+
     return _formatValues(this, 'date', date, options)
   };
   Vue.prototype.$date = _formatDate;
@@ -3601,7 +3607,7 @@ var gettextMixin = {
   }
 };
 
-plugin.version = '0.0.16';
+plugin.version = '0.0.18';
 
 if (typeof window !== 'undefined' && window.Vue) {
   window.Vue.use(plugin);

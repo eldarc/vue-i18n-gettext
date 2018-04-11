@@ -34,7 +34,7 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
         break
     }
 
-    if (FORMATTER && value) {
+    if (FORMATTER && value !== undefined && value !== null && value !== false) {
       if (typeof options === 'object') {
         options = Object.assign(context.$i18n[`${type}Format`], options)
       } else {
@@ -60,6 +60,12 @@ function plugin (Vue: any, options: Object = {}, router, marked) {
   Vue.prototype.$_c = _formatCurrency
 
   const _formatDate = function (date, options) {
+    // Convert unix timestamp to date.
+    // TODO: Make this toggleable trough config.
+    if (Number.isInteger(date)) {
+      date = new Date(date * 1000)
+    }
+
     return _formatValues(this, 'date', date, options)
   }
   Vue.prototype.$date = _formatDate
